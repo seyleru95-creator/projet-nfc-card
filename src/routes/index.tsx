@@ -36,7 +36,10 @@ export const Route = createFileRoute("/")({
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap",
+      },
     ],
     meta: [
       { title: "Profile" },
@@ -48,7 +51,15 @@ export const Route = createFileRoute("/")({
 
 function InstagramIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
       <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
@@ -58,7 +69,15 @@ function InstagramIcon({ className }: { className?: string }) {
 
 function TikTokIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
     </svg>
   );
@@ -70,42 +89,88 @@ function Index() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [modalIndex, setModalIndex] = useState(0);
+
   useEffect(() => {
     supabase
       .from("profile")
       .select("*")
       .eq("id", PROFILE_ID)
       .single()
-      .then(({ data }) => { if (data) setProfile(data); });
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Erreur profil :", error);
+          return;
+        }
+        if (data) setProfile(data);
+      });
 
     supabase
       .from("gallery")
       .select("*")
       .order("id", { ascending: false })
-      .then(({ data }) => { if (data) setGallery(data); });
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Erreur galerie :", error);
+          return;
+        }
+        if (data) setGallery(data);
+      });
   }, []);
 
   useEffect(() => {
-  if (gallery.length === 0 || modalOpen) return;
+    if (gallery.length === 0 || modalOpen) return;
 
-  const timer = setInterval(() => {
-    setCurrentIndex((prev) => (prev + 1) % gallery.length);
-  }, SLIDE_INTERVAL);
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % gallery.length);
+    }, SLIDE_INTERVAL);
 
-  return () => clearInterval(timer);
-}, [gallery, modalOpen]); // ← RETIRER currentIndex des dépendances
+    return () => clearInterval(timer);
+  }, [gallery, modalOpen]);
+
+  useEffect(() => {
+    if (!modalOpen || gallery.length === 0) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setModalOpen(false);
+      }
+      if (event.key === "ArrowLeft") {
+        setModalIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
+      }
+      if (event.key === "ArrowRight") {
+        setModalIndex((prev) => (prev + 1) % gallery.length);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modalOpen, gallery.length]);
 
   if (!profile) {
     return (
-      <div style={{ minHeight: "100vh", background: "radial-gradient(circle at top, oklch(0.78 0.09 285), oklch(0.62 0.08 260) 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          background:
+            "radial-gradient(circle at top, oklch(0.78 0.09 285), oklch(0.62 0.08 260) 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <p style={{ color: "white" }}>Chargement...</p>
       </div>
     );
   }
 
-  const links: { key: keyof ProfileData; label: string; icon: React.ReactNode }[] = [
+  const links: {
+    key: keyof ProfileData;
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
     { key: "instagram", label: "Instagram", icon: <InstagramIcon className="size-[18px]" /> },
     { key: "tiktok", label: "TikTok", icon: <TikTokIcon className="size-[18px]" /> },
     { key: "website", label: "Website", icon: <Globe className="size-[18px]" /> },
@@ -116,17 +181,59 @@ function Index() {
 
   const activeLinks = links.filter(({ key }) => profile[key]);
 
-  // ← Fond lu depuis Supabase
+  const formatLink = (key: keyof ProfileData, value: string) => {
+    if (!value) return "#";
+
+    switch (key) {
+      case "instagram":
+        return value.startsWith("http")
+          ? value
+          : `https://instagram.com/${value.replace("@", "")}`;
+      case "tiktok":
+        return value.startsWith("http")
+          ? value
+          : `https://www.tiktok.com/@${value.replace("@", "")}`;
+      case "website":
+        return value.startsWith("http") ? value : `https://${value}`;
+      case "whatsapp":
+        return `https://wa.me/${value.replace(/\D/g, "")}`;
+      case "email":
+        return `mailto:${value}`;
+      case "phone":
+        return `tel:${value}`;
+      default:
+        return value;
+    }
+  };
+
   const bgStyle: React.CSSProperties =
     profile.background_type === "image"
       ? {
-          backgroundImage: profile.background_value,
+          backgroundImage: profile.background_value.startsWith("url(")
+            ? profile.background_value
+            : `url("${profile.background_value}")`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }
       : { background: profile.background_value };
 
   const overlayOpacity = (profile.background_opacity ?? 45) / 100;
+
+  const goToPreviousSlide = () => {
+    setCurrentIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
+  };
+
+  const goToNextSlide = () => {
+    setCurrentIndex((prev) => (prev + 1) % gallery.length);
+  };
+
+  const goToPreviousModal = () => {
+    setModalIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
+  };
+
+  const goToNextModal = () => {
+    setModalIndex((prev) => (prev + 1) % gallery.length);
+  };
 
   return (
     <div className="relative min-h-screen" style={bgStyle}>
@@ -136,19 +243,24 @@ function Index() {
           style={{ backgroundColor: `rgba(10, 8, 20, ${overlayOpacity})` }}
         />
       )}
+
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:py-16">
         <main className="glass-panel animate-in fade-in slide-in-from-bottom-4 w-full max-w-sm rounded-[2rem] p-6 text-card-foreground duration-700 sm:p-8">
-
           {/* Hero */}
           <div className="flex flex-col items-center text-center">
             <div className="photo-ring h-40 w-40 overflow-hidden rounded-full sm:h-48 sm:w-48">
               <img
-                src={profile.photo_url || "https://ui-avatars.com/api/?name=" + profile.name}
+                src={
+                  profile.photo_url ||
+                  "https://ui-avatars.com/api/?name=" +
+                    encodeURIComponent(profile.name)
+                }
                 alt={profile.name}
                 className="h-full w-full object-cover"
                 loading="eager"
               />
             </div>
+
             <h1 className="mt-5 text-2xl font-semibold tracking-tight text-card-foreground sm:text-3xl">
               {profile.name}
             </h1>
@@ -163,25 +275,38 @@ function Index() {
           {/* Liens */}
           {activeLinks.length > 0 && (
             <div className="mt-6 flex w-full flex-col gap-3">
-              {activeLinks.map(({ key, label, icon }) => (
-                <a
-                  key={key}
-                  href={profile[key] as string}
-                  target={key === "email" || key === "phone" ? undefined : "_blank"}
-                  rel={key === "email" || key === "phone" ? undefined : "noopener noreferrer"}
-                  className="group flex items-center justify-between rounded-2xl border border-border/70 bg-card/65 px-4 py-3.5 text-sm font-medium text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card/85 hover:shadow-md active:scale-[0.98] sm:py-4"
-                >
-                  <span className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/70 text-primary transition-colors duration-200 group-hover:bg-primary/12 group-hover:text-primary">
-                      {icon}
+              {activeLinks.map(({ key, label, icon }) => {
+                const rawValue = profile[key] as string;
+                const href = formatLink(key, rawValue);
+
+                return (
+                  <a
+                    key={key}
+                    href={href}
+                    target={key === "email" || key === "phone" ? undefined : "_blank"}
+                    rel={key === "email" || key === "phone" ? undefined : "noopener noreferrer"}
+                    className="group flex items-center justify-between rounded-2xl border border-border/70 bg-card/65 px-4 py-3.5 text-sm font-medium text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card/85 hover:shadow-md active:scale-[0.98] sm:py-4"
+                    aria-label={`${label} : ${rawValue}`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/70 text-primary transition-colors duration-200 group-hover:bg-primary/12 group-hover:text-primary">
+                        {icon}
+                      </span>
+                      <span>{label}</span>
                     </span>
-                    <span>{label}</span>
-                  </span>
-                  <svg className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </a>
-              ))}
+                    <svg
+                      className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                );
+              })}
             </div>
           )}
 
@@ -193,43 +318,56 @@ function Index() {
               </h2>
 
               {/* Carrousel */}
-              <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/50 shadow-sm aspect-[4/3]">
-
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border/60 bg-card/50 shadow-sm">
                 <img
                   src={gallery[currentIndex].image_url}
-                  alt={gallery[currentIndex].caption || ""}
-                  className="h-full w-full object-cover cursor-pointer transition-opacity duration-500"
+                  alt={gallery[currentIndex].caption || `Photo ${currentIndex + 1}`}
+                  className="h-full w-full cursor-pointer object-cover transition-opacity duration-500"
                   loading="lazy"
                   onClick={() => {
-                  setModalIndex(currentIndex); // ← mémoriser l'index au moment du clic
-                  setModalOpen(true);
+                    setModalIndex(currentIndex);
+                    setModalOpen(true);
                   }}
                 />
 
                 {/* Flèche gauche */}
                 <button
-                  onClick={() => setCurrentIndex((prev) => (prev - 1 + gallery.length) % gallery.length)}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
+                  onClick={goToPreviousSlide}
+                  className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
                   aria-label="Photo précédente"
+                  type="button"
                 >
-                  <svg fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="h-4 w-4">
+                  <svg
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
 
                 {/* Flèche droite */}
                 <button
-                  onClick={() => setCurrentIndex((prev) => (prev + 1) % gallery.length)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
+                  onClick={goToNextSlide}
+                  className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
                   aria-label="Photo suivante"
+                  type="button"
                 >
-                  <svg fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="h-4 w-4">
+                  <svg
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
 
                 {/* Points indicateurs */}
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
                   {gallery.map((_, i) => (
                     <button
                       key={i}
@@ -238,6 +376,7 @@ function Index() {
                         i === currentIndex ? "w-4 bg-white" : "w-1.5 bg-white/50"
                       }`}
                       aria-label={`Aller à la photo ${i + 1}`}
+                      type="button"
                     />
                   ))}
                 </div>
@@ -248,24 +387,78 @@ function Index() {
                 <div
                   className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
                   onClick={() => setModalOpen(false)}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Galerie photo"
                 >
                   <div
                     className="relative max-h-[90vh] max-w-[90vw]"
                     onClick={(e) => e.stopPropagation()}
                   >
+                    {/* Fermer */}
                     <button
                       onClick={() => setModalOpen(false)}
                       className="absolute -top-3 -right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm hover:bg-white/40"
+                      type="button"
+                      aria-label="Fermer la galerie"
                     >
-                      <svg fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="h-4 w-4">
+                      <svg
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                      >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
+
+                    {/* Précédente dans la modal */}
+                    {gallery.length > 1 && (
+                      <button
+                        onClick={goToPreviousModal}
+                        className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
+                        type="button"
+                        aria-label="Voir la photo précédente"
+                      >
+                        <svg
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          viewBox="0 0 24 24"
+                          className="h-4 w-4"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                    )}
+
+                    {/* Suivante dans la modal */}
+                    {gallery.length > 1 && (
+                      <button
+                        onClick={goToNextModal}
+                        className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
+                        type="button"
+                        aria-label="Voir la photo suivante"
+                      >
+                        <svg
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          viewBox="0 0 24 24"
+                          className="h-4 w-4"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    )}
+
                     <img
                       src={gallery[modalIndex].image_url}
-                      alt={gallery[modalIndex].caption || ""}
+                      alt={gallery[modalIndex].caption || `Photo ${modalIndex + 1}`}
                       className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
                     />
+
                     {gallery[modalIndex].caption && (
                       <p className="mt-2 text-center text-sm text-white/80">
                         {gallery[modalIndex].caption}
@@ -279,9 +472,10 @@ function Index() {
 
           {/* Footer */}
           <footer className="mt-8 pb-2 text-center">
-            <p className="text-[11px] text-muted-foreground">{profile.name} — Personal Profile</p>
+            <p className="text-[11px] text-muted-foreground">
+              {profile.name} — Personal Profile
+            </p>
           </footer>
-
         </main>
       </div>
     </div>
