@@ -1,27 +1,35 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useRef } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Link } from "@tanstack/react-router";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error("Variables Supabase manquantes");
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const ADMIN_PASSWORD = "123";
 const PROFILE_ID = "63f004d7-46e9-4f4f-8e23-a4fba1118bde";
 
-type Profile = {
+type ProfileData = {
   id: string;
   name: string;
   subtitle: string;
   bio: string;
-  photo_url: string | null;
+  photo_url: string;
   instagram: string;
+  tiktok: string;
+  linkedin: string;
+  website: string;
   whatsapp: string;
   email: string;
   phone: string;
-  tiktok: string;
-  website: string;
+  background_type: "solid" | "gradient" | "image";
+  background_value: string;
+  background_opacity: number;
 };
 
 type GalleryItem = {
@@ -47,6 +55,7 @@ function AdminPage() {
             e.preventDefault();
             if (pw === ADMIN_PASSWORD) {
               setAuthOk(true);
+              setErr("");
             } else {
               setErr("Code incorrect");
             }
@@ -74,13 +83,12 @@ function AdminPage() {
 }
 
 function AdminDashboard() {
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [newCaption, setNewCaption] = useState("");
 
-  // States fond
   const [bgType, setBgType] = useState<"solid" | "gradient" | "image">("gradient");
   const [bgColor1, setBgColor1] = useState("#7c6bda");
   const [bgColor2, setBgColor2] = useState("#5b4fc8");
@@ -102,32 +110,55 @@ function AdminDashboard() {
       .select("*")
       .eq("id", PROFILE_ID)
       .single();
+
     if (error) {
       console.error("Erreur loadProfile:", error.message);
-    } else {
-      setProfile(data);
-      // Charger les valeurs de fond depuis Supabase
-      if (data.background_type) setBgType(data.background_type);
-      if (data.background_opacity !== null) setBgOpacity(data.background_opacity);
-      if (data.background_value) {
-        const val = data.background_value;
-        if (data.background_type === "solid") {
-          setBgColor1(val);
-        } else if (data.background_type === "gradient") {
-          // Extraire les couleurs du gradient sauvegardé
-          const colorMatches = val.match(/#[0-9a-fA-F]{6}/g);
-          if (colorMatches && colorMatches.length >= 2) {
-            setBgColor1(colorMatches[0]);
-            setBgColor2(colorMatches[1]);
-          }
-          if (val.startsWith("radial")) setBgDirection("circle at top");
-          else if (val.includes("to bottom right")) setBgDirection("to bottom right");
-          else if (val.includes("to right")) setBgDirection("to right");
-          else setBgDirection("to bottom");
-        } else if (data.background_type === "image") {
-          const urlMatch = val.match(/url\((.+)\)/);
-          if (urlMatch) setBgImageUrl(urlMatch[1]);
+      setMsg("Erreur chargement profil : " + error.message);
+      return;
+    }
+
+    const normalized: ProfileData = {
+      id: data.id,
+      name: data.name || "",
+      subtitle: data.subtitle || "",
+      bio: data.bio || "",
+      photo_url: data.photo_url || "",
+      instagram: data.instagram || "",
+      tiktok: data.tiktok || "",
+      linkedin: data.linkedin || "",
+      website: data.website || "",
+      whatsapp: data.whatsapp || "",
+      email: data.email || "",
+      phone: data.phone || "",
+      background_type: data.background_type || "gradient",
+      background_value: data.background_value || "",
+      background_opacity: data.background_opacity ?? 45,
+    };
+
+    setProfile(normalized);
+
+    if (normalized.background_type) setBgType(normalized.background_type);
+    if (normalized.background_opacity !== null) setBgOpacity(normalized.background_opacity);
+
+    if (normalized.background_value) {
+      const val = normalized.background_value;
+
+      if (normalized.background_type === "solid") {
+        setBgColor1(val);
+      } else if (normalized.background_type === "gradient") {
+        const colorMatches = val.match(/#[0-9a-fA-F]{6}/g);
+        if (colorMatches && colorMatches.length >= 2) {
+          setBgColor1(colorMatches[0]);
+          setBgColor2(colorMatches[1]);
         }
+
+        if (val.startsWith("radial")) setBgDirection("circle at top");
+        else if (val.includes("to bottom right")) setBgDirection("to bottom right");
+        else if (val.includes("to right")) setBgDirection("to right");
+        else setBgDirection("to bottom");
+      } else if (normalized.background_type === "image") {
+        const urlMatch = val.match(/url\(["']?(.*?)["']?\)/);
+        if (urlMatch?.[1]) setBgImageUrl(urlMatch[1]);
       }
     }
   }
@@ -137,32 +168,42 @@ function AdminDashboard() {
       .from("gallery")
       .select("*")
       .order("id", { ascending: false });
+
     if (error) {
       console.error("Erreur loadGallery:", error.message);
-    } else {
-      setGallery(data);
+      setMsg("Erreur chargement galerie : " + error.message);
+      return;
     }
+
+    setGallery((data || []) as GalleryItem[]);
   }
 
   async function saveProfile() {
     if (!profile) return;
+
     setSaving(true);
     setMsg("");
+
+    const payload = {
+      name: profile.name,
+      subtitle: profile.subtitle,
+      bio: profile.bio,
+      instagram: profile.instagram,
+      tiktok: profile.tiktok,
+      linkedin: profile.linkedin,
+      website: profile.website,
+      whatsapp: profile.whatsapp,
+      email: profile.email,
+      phone: profile.phone,
+    };
+
     const { error } = await supabase
       .from("profile")
-      .update({
-        name: profile.name,
-        subtitle: profile.subtitle,
-        bio: profile.bio,
-        instagram: profile.instagram,
-        whatsapp: profile.whatsapp,
-        email: profile.email,
-        phone: profile.phone,
-        tiktok: profile.tiktok,
-        website: profile.website,
-      })
+      .update(payload)
       .eq("id", PROFILE_ID);
+
     setSaving(false);
+
     if (error) {
       setMsg("Erreur : " + error.message);
     } else {
@@ -172,39 +213,58 @@ function AdminDashboard() {
 
   async function uploadAvatar(file: File) {
     const ext = file.name.split(".").pop();
-    const path = "avatars/profile." + ext;
+    const path = `avatars/profile.${ext}`;
+
     const { error: upErr } = await supabase.storage
       .from("profile")
       .upload(path, file, { upsert: true });
+
     if (upErr) {
       setMsg("Erreur avatar : " + upErr.message);
       return;
     }
+
     const { data } = supabase.storage.from("profile").getPublicUrl(path);
     const photo_url = data.publicUrl + "?t=" + Date.now();
-    await supabase.from("profile").update({ photo_url }).eq("id", PROFILE_ID);
-    setProfile((p) => (p ? { ...p, photo_url } : p));
+
+    const { error } = await supabase
+      .from("profile")
+      .update({ photo_url })
+      .eq("id", PROFILE_ID);
+
+    if (error) {
+      setMsg("Erreur MAJ avatar : " + error.message);
+      return;
+    }
+
+    setProfile((prev) => (prev ? { ...prev, photo_url } : prev));
     setMsg("Avatar mis à jour !");
   }
 
   async function uploadGalleryPhoto(file: File) {
-    const path = "gallery/" + Date.now() + "_" + file.name;
+    const path = `gallery/${Date.now()}_${file.name}`;
+
     const { error: upErr } = await supabase.storage
       .from("gallery")
       .upload(path, file);
+
     if (upErr) {
       setMsg("Erreur galerie : " + upErr.message);
       return;
     }
+
     const { data } = supabase.storage.from("gallery").getPublicUrl(path);
+
     const { error: dbErr } = await supabase.from("gallery").insert({
       image_url: data.publicUrl,
       caption: newCaption || file.name,
     });
+
     if (dbErr) {
       setMsg("Erreur DB galerie : " + dbErr.message);
       return;
     }
+
     setNewCaption("");
     setMsg("Photo ajoutée !");
     loadGallery();
@@ -212,9 +272,11 @@ function AdminDashboard() {
 
   async function deleteGalleryItem(item: GalleryItem) {
     const urlParts = item.image_url.split("/gallery/");
+
     if (urlParts[1]) {
       await supabase.storage.from("gallery").remove([urlParts[1]]);
     }
+
     await supabase.from("gallery").delete().eq("id", item.id);
     setGallery((g) => g.filter((x) => x.id !== item.id));
     setMsg("Photo supprimée");
@@ -222,15 +284,18 @@ function AdminDashboard() {
 
   async function saveBg() {
     let value = "";
+
     if (bgType === "solid") {
       value = bgColor1;
     } else if (bgType === "gradient") {
-      value = bgDirection === "circle at top"
-        ? `radial-gradient(circle at top, ${bgColor1}, ${bgColor2})`
-        : `linear-gradient(${bgDirection}, ${bgColor1}, ${bgColor2})`;
+      value =
+        bgDirection === "circle at top"
+          ? `radial-gradient(circle at top, ${bgColor1}, ${bgColor2})`
+          : `linear-gradient(${bgDirection}, ${bgColor1}, ${bgColor2})`;
     } else {
       value = `url(${bgImageUrl})`;
     }
+
     const { error } = await supabase
       .from("profile")
       .update({
@@ -239,11 +304,11 @@ function AdminDashboard() {
         background_opacity: bgOpacity,
       })
       .eq("id", PROFILE_ID);
+
     if (error) setMsg("Erreur fond : " + error.message);
-    else setMsg("✅ Fond sauvegardé !");
+    else setMsg("Fond sauvegardé !");
   }
 
-  // Calcul aperçu fond
   const bgPreview =
     bgType === "solid"
       ? bgColor1
@@ -259,36 +324,73 @@ function AdminDashboard() {
     return <p style={{ color: "white", padding: 32 }}>Chargement...</p>;
   }
 
-  const profileFields: (keyof Profile)[] = [
-    "name", "subtitle", "bio", "instagram",
-    "whatsapp", "email", "phone", "tiktok", "website",
+  const profileFields: (keyof ProfileData)[] = [
+    "name",
+    "subtitle",
+    "bio",
+    "instagram",
+    "tiktok",
+    "linkedin",
+    "website",
+    "whatsapp",
+    "email",
+    "phone",
   ];
 
   return (
-  <div style={styles.page}>
-
-    {/* ← REMPLACE le <h1> par ça */}
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-      <h1 style={{ ...styles.h1, marginBottom: 0 }}>Paramètres du profil</h1>
-      <Link to="/" target="_blank" rel="noopener noreferrer"
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#334155", color: "white", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 500, textDecoration: "none" }}
+    <div style={styles.page}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 24,
+          gap: 12,
+          flexWrap: "wrap",
+        }}
       >
-        <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ width: 15, height: 15 }}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Voir le profil
-      </Link>
-    </div>
+        <h1 style={{ ...styles.h1, marginBottom: 0 }}>Paramètres du profil</h1>
 
-      {/* ── Profil ── */}
+        <Link
+          to="/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: "#334155",
+            color: "white",
+            borderRadius: 8,
+            padding: "8px 14px",
+            fontSize: 13,
+            fontWeight: 500,
+            textDecoration: "none",
+          }}
+        >
+          <svg
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+            style={{ width: 15, height: 15 }}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Voir le profil
+        </Link>
+      </div>
+
       <section style={styles.card}>
         <h2 style={styles.h2}>Profil</h2>
+
         <div style={styles.avatarRow}>
           <img
             src={profile.photo_url || "https://ui-avatars.com/api/?name=Admin"}
             alt="avatar"
             style={styles.avatarImg}
           />
+
           <div>
             <p style={styles.avatarLabel}>Photo de profil</p>
             <input
@@ -297,22 +399,28 @@ function AdminDashboard() {
               ref={avatarRef}
               style={{ display: "none" }}
               onChange={(e) => {
-                if (e.target.files && e.target.files[0]) uploadAvatar(e.target.files[0]);
+                if (e.target.files?.[0]) uploadAvatar(e.target.files[0]);
               }}
             />
-            <button style={styles.btnSecondary} onClick={() => avatarRef.current?.click()}>
+            <button
+              type="button"
+              style={styles.btnSecondary}
+              onClick={() => avatarRef.current?.click()}
+            >
               Changer avatar
             </button>
           </div>
         </div>
+
         {profileFields.map((field) => (
           <div key={field} style={{ marginBottom: 10 }}>
             <label style={styles.label}>{field}</label>
+
             {field === "bio" ? (
               <textarea
                 value={(profile[field] as string) || ""}
                 rows={3}
-                style={{ ...styles.input, resize: "vertical" } as React.CSSProperties}
+                style={{ ...styles.input, resize: "vertical" }}
                 onChange={(e) => setProfile({ ...profile, [field]: e.target.value })}
               />
             ) : (
@@ -320,30 +428,34 @@ function AdminDashboard() {
                 type="text"
                 value={(profile[field] as string) || ""}
                 style={styles.input}
+                placeholder={field === "linkedin" ? "https://linkedin.com/in/ton-profil" : ""}
                 onChange={(e) => setProfile({ ...profile, [field]: e.target.value })}
               />
             )}
           </div>
         ))}
+
         <button onClick={saveProfile} disabled={saving} style={styles.btnPrimary}>
           {saving ? "Sauvegarde..." : "Sauvegarder"}
         </button>
+
         {msg !== "" && (
-          <p style={{ color: "#86efac", marginTop: 8, fontSize: 13 }}>{msg}</p>
+          <p style={{ color: msg.toLowerCase().includes("erreur") ? "#fca5a5" : "#86efac", marginTop: 8, fontSize: 13 }}>
+            {msg}
+          </p>
         )}
       </section>
 
-      {/* ── Fond ── */}
       <section style={styles.card}>
-        <h2 style={styles.h2}>🎨 Fond de la carte</h2>
+        <h2 style={styles.h2}>Fond de la carte</h2>
 
-        {/* Type */}
         <div style={{ marginBottom: 12 }}>
           <label style={styles.label}>Type de fond</label>
           <div style={{ display: "flex", gap: 8 }}>
             {(["solid", "gradient", "image"] as const).map((t) => (
               <button
                 key={t}
+                type="button"
                 onClick={() => setBgType(t)}
                 style={{
                   flex: 1,
@@ -357,13 +469,12 @@ function AdminDashboard() {
                   fontWeight: bgType === t ? 600 : 400,
                 }}
               >
-                {t === "solid" ? "🟣 Uni" : t === "gradient" ? "🌈 Dégradé" : "🖼️ Image"}
+                {t === "solid" ? "Uni" : t === "gradient" ? "Dégradé" : "Image"}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Couleur unie */}
         {bgType === "solid" && (
           <div style={{ marginBottom: 12 }}>
             <label style={styles.label}>Couleur</label>
@@ -376,7 +487,6 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* Dégradé */}
         {bgType === "gradient" && (
           <>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -389,6 +499,7 @@ function AdminDashboard() {
                   style={{ width: "100%", height: 48, borderRadius: 8, border: "none", cursor: "pointer" }}
                 />
               </div>
+
               <div style={{ flex: 1 }}>
                 <label style={styles.label}>Couleur 2</label>
                 <input
@@ -399,6 +510,7 @@ function AdminDashboard() {
                 />
               </div>
             </div>
+
             <div style={{ marginBottom: 12 }}>
               <label style={styles.label}>Direction</label>
               <select
@@ -406,20 +518,20 @@ function AdminDashboard() {
                 onChange={(e) => setBgDirection(e.target.value)}
                 style={{ ...styles.input, cursor: "pointer" }}
               >
-                <option value="circle at top">⭕ Radial</option>
-                <option value="to bottom">↓ Vertical</option>
-                <option value="to right">→ Horizontal</option>
-                <option value="to bottom right">↘ Diagonal</option>
+                <option value="circle at top">Radial</option>
+                <option value="to bottom">Vertical</option>
+                <option value="to right">Horizontal</option>
+                <option value="to bottom right">Diagonal</option>
               </select>
             </div>
           </>
         )}
 
-        {/* Image */}
         {bgType === "image" && (
           <>
             <div style={{ marginBottom: 12 }}>
               <label style={styles.label}>Image de fond</label>
+
               <input
                 type="file"
                 accept="image/*"
@@ -428,16 +540,27 @@ function AdminDashboard() {
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  const path = `bg-${Date.now()}-${file.name}`;
+
+                  const path = `backgrounds/bg-${Date.now()}-${file.name}`;
+
                   const { data, error } = await supabase.storage
                     .from("profile")
                     .upload(path, file, { upsert: true });
-                  if (error) { setMsg("Erreur upload fond : " + error.message); return; }
-                  const { data: urlData } = supabase.storage.from("profile").getPublicUrl(data.path);
+
+                  if (error) {
+                    setMsg("Erreur upload fond : " + error.message);
+                    return;
+                  }
+
+                  const { data: urlData } = supabase.storage
+                    .from("profile")
+                    .getPublicUrl(data.path);
+
                   setBgImageUrl(urlData.publicUrl);
                   setMsg("Image chargée, clique Sauvegarder.");
                 }}
               />
+
               <label
                 htmlFor="bg-upload"
                 style={{
@@ -450,16 +573,24 @@ function AdminDashboard() {
                   cursor: "pointer",
                 }}
               >
-                🖼️ Choisir une image
+                Choisir une image
               </label>
+
               {bgImageUrl && (
                 <img
                   src={bgImageUrl}
                   alt="Aperçu fond"
-                  style={{ marginTop: 8, width: "100%", height: 100, objectFit: "cover", borderRadius: 8 }}
+                  style={{
+                    marginTop: 8,
+                    width: "100%",
+                    height: 100,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                  }}
                 />
               )}
             </div>
+
             <div style={{ marginBottom: 12 }}>
               <label style={styles.label}>Overlay sombre : {bgOpacity}%</label>
               <input
@@ -474,65 +605,83 @@ function AdminDashboard() {
           </>
         )}
 
-        {/* Aperçu */}
         <div style={{ marginBottom: 12 }}>
           <label style={styles.label}>Aperçu</label>
-          <div style={{
-            height: 80,
-            borderRadius: 12,
-            background: bgPreview,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            border: "1px solid #334155",
-            position: "relative",
-            overflow: "hidden",
-          }}>
+          <div
+            style={{
+              height: 80,
+              borderRadius: 12,
+              background: bgPreview,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              border: "1px solid #334155",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
             {bgType === "image" && (
-              <div style={{
-                position: "absolute", inset: 0,
-                backgroundColor: `rgba(10, 8, 20, ${bgOpacity / 100})`,
-              }} />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  backgroundColor: `rgba(10, 8, 20, ${bgOpacity / 100})`,
+                }}
+              />
             )}
           </div>
         </div>
 
         <button onClick={saveBg} style={styles.btnPrimary}>
-          💾 Sauvegarder le fond
+          Sauvegarder le fond
         </button>
       </section>
 
-      {/* ── Galerie ── */}
       <section style={styles.card}>
         <h2 style={styles.h2}>Galerie</h2>
+
         <div style={styles.galleryAddRow}>
           <input
             type="text"
             placeholder="Légende optionnelle"
             value={newCaption}
             onChange={(e) => setNewCaption(e.target.value)}
-            style={{ ...styles.input, flex: 1, minWidth: 140 } as React.CSSProperties}
+            style={{ ...styles.input, flex: 1, minWidth: 140 }}
           />
+
           <input
             type="file"
             accept="image/*"
             ref={galleryRef}
             style={{ display: "none" }}
             onChange={(e) => {
-              if (e.target.files && e.target.files[0]) uploadGalleryPhoto(e.target.files[0]);
+              if (e.target.files?.[0]) uploadGalleryPhoto(e.target.files[0]);
             }}
           />
-          <button style={styles.btnPrimary} onClick={() => galleryRef.current?.click()}>
+
+          <button
+            type="button"
+            style={styles.btnPrimary}
+            onClick={() => galleryRef.current?.click()}
+          >
             Ajouter photo
           </button>
         </div>
+
         <div style={styles.galleryGrid}>
           {gallery.map((item) => (
             <div key={item.id} style={styles.galleryItem}>
               <img src={item.image_url} alt={item.caption} style={styles.galleryImg} />
               <div style={styles.galleryCaption}>{item.caption}</div>
-              <button onClick={() => deleteGalleryItem(item)} style={styles.deleteBtn}>✕</button>
+              <button
+                type="button"
+                onClick={() => deleteGalleryItem(item)}
+                style={styles.deleteBtn}
+              >
+                ✕
+              </button>
             </div>
           ))}
+
           {gallery.length === 0 && (
             <p style={{ color: "#475569", fontSize: 13 }}>Aucune photo</p>
           )}
@@ -543,25 +692,151 @@ function AdminDashboard() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  authWrapper: { minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center" },
-  authForm: { background: "#1e293b", padding: 32, borderRadius: 16, display: "flex", flexDirection: "column", gap: 12, width: 280 },
-  authTitle: { color: "white", textAlign: "center", margin: 0 },
-  page: { minHeight: "100vh", background: "#0f172a", color: "white", padding: 32, maxWidth: 800, margin: "0 auto" },
-  card: { background: "#1e293b", borderRadius: 16, padding: 24, marginBottom: 24 },
-  h1: { fontSize: 24, fontWeight: 700, marginBottom: 24 },
-  h2: { fontSize: 18, fontWeight: 600, marginBottom: 16, color: "#a5b4fc" },
-  label: { display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 4, textTransform: "capitalize" },
-  input: { width: "100%", background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", color: "white", fontSize: 14, boxSizing: "border-box" },
-  btnPrimary: { background: "#6366f1", color: "white", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 14, cursor: "pointer" },
-  btnSecondary: { background: "#334155", color: "white", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 13, cursor: "pointer" },
-  errText: { color: "#f87171", margin: 0, fontSize: 12 },
-  avatarRow: { display: "flex", alignItems: "center", gap: 16, marginBottom: 16 },
-  avatarImg: { width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "2px solid #6366f1" },
-  avatarLabel: { color: "#94a3b8", fontSize: 12, margin: "0 0 6px" },
-  galleryAddRow: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" },
-  galleryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 },
-  galleryItem: { position: "relative", borderRadius: 8, overflow: "hidden", background: "#0f172a" },
-  galleryImg: { width: "100%", height: 120, objectFit: "cover", display: "block" },
-  galleryCaption: { padding: "4px 8px", fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  deleteBtn: { position: "absolute", top: 4, right: 4, background: "#ef4444", border: "none", borderRadius: 6, color: "white", cursor: "pointer", fontSize: 12, padding: "2px 6px" },
+  authWrapper: {
+    minHeight: "100vh",
+    background: "#0f172a",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  authForm: {
+    background: "#1e293b",
+    padding: 32,
+    borderRadius: 16,
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    width: 280,
+  },
+  authTitle: {
+    color: "white",
+    textAlign: "center",
+    margin: 0,
+  },
+  page: {
+    minHeight: "100vh",
+    background: "#0f172a",
+    color: "white",
+    padding: 32,
+    maxWidth: 800,
+    margin: "0 auto",
+  },
+  card: {
+    background: "#1e293b",
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+  },
+  h1: {
+    fontSize: 24,
+    fontWeight: 700,
+    marginBottom: 24,
+  },
+  h2: {
+    fontSize: 18,
+    fontWeight: 600,
+    marginBottom: 16,
+    color: "#a5b4fc",
+  },
+  label: {
+    display: "block",
+    fontSize: 12,
+    color: "#94a3b8",
+    marginBottom: 4,
+    textTransform: "capitalize",
+  },
+  input: {
+    width: "100%",
+    background: "#0f172a",
+    border: "1px solid #334155",
+    borderRadius: 8,
+    padding: "8px 12px",
+    color: "white",
+    fontSize: 14,
+    boxSizing: "border-box",
+  },
+  btnPrimary: {
+    background: "#6366f1",
+    color: "white",
+    border: "none",
+    borderRadius: 8,
+    padding: "8px 16px",
+    fontSize: 14,
+    cursor: "pointer",
+  },
+  btnSecondary: {
+    background: "#334155",
+    color: "white",
+    border: "none",
+    borderRadius: 8,
+    padding: "6px 12px",
+    fontSize: 13,
+    cursor: "pointer",
+  },
+  errText: {
+    color: "#f87171",
+    margin: 0,
+    fontSize: 12,
+  },
+  avatarRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 16,
+  },
+  avatarImg: {
+    width: 72,
+    height: 72,
+    borderRadius: "50%",
+    objectFit: "cover",
+    border: "2px solid #6366f1",
+  },
+  avatarLabel: {
+    color: "#94a3b8",
+    fontSize: 12,
+    margin: "0 0 6px",
+  },
+  galleryAddRow: {
+    display: "flex",
+    gap: 8,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+  galleryGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+    gap: 12,
+  },
+  galleryItem: {
+    position: "relative",
+    borderRadius: 8,
+    overflow: "hidden",
+    background: "#0f172a",
+  },
+  galleryImg: {
+    width: "100%",
+    height: 120,
+    objectFit: "cover",
+    display: "block",
+  },
+  galleryCaption: {
+    padding: "4px 8px",
+    fontSize: 11,
+    color: "#94a3b8",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  deleteBtn: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    background: "#ef4444",
+    border: "none",
+    borderRadius: 6,
+    color: "white",
+    cursor: "pointer",
+    fontSize: 12,
+    padding: "2px 6px",
+  },
 };

@@ -1,10 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Globe, Mail, MessageCircle, Phone } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Globe, Linkedin, Mail, MessageCircle, Phone } from "lucide-react";
+import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error("Variables Supabase manquantes");
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const PROFILE_ID = "63f004d7-46e9-4f4f-8e23-a4fba1118bde";
@@ -16,6 +21,7 @@ type ProfileData = {
   photo_url: string;
   instagram: string;
   tiktok: string;
+  linkedin: string;
   website: string;
   whatsapp: string;
   email: string;
@@ -35,7 +41,11 @@ export const Route = createFileRoute("/")({
   head: () => ({
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous",
+      },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap",
@@ -104,7 +114,7 @@ function Index() {
           console.error("Erreur profil :", error);
           return;
         }
-        if (data) setProfile(data);
+        if (data) setProfile(data as ProfileData);
       });
 
     supabase
@@ -116,7 +126,7 @@ function Index() {
           console.error("Erreur galerie :", error);
           return;
         }
-        if (data) setGallery(data);
+        if (data) setGallery(data as GalleryItem[]);
       });
   }, []);
 
@@ -149,6 +159,110 @@ function Index() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [modalOpen, gallery.length]);
 
+  const formatLink = (key: keyof ProfileData, value: string) => {
+    if (!value) return "#";
+
+    switch (key) {
+      case "instagram":
+        return value.startsWith("http")
+          ? value
+          : `https://instagram.com/${value.replace("@", "")}`;
+
+      case "tiktok":
+        return value.startsWith("http")
+          ? value
+          : `https://www.tiktok.com/@${value.replace("@", "")}`;
+
+      case "linkedin":
+        return value.startsWith("http")
+          ? value
+          : `https://www.linkedin.com/in/${value.replace(/^@/, "").replace(/^\/+/, "")}`;
+
+      case "website":
+        return value.startsWith("http") ? value : `https://${value}`;
+
+      case "whatsapp":
+        return `https://wa.me/${value.replace(/\D/g, "")}`;
+
+      case "email":
+        return `mailto:${value}`;
+
+      case "phone":
+        return `tel:${value}`;
+
+      default:
+        return value;
+    }
+  };
+
+  const buildVCard = () => {
+    if (!profile) return "";
+
+    const cleanText = (value?: string) =>
+      (value || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\n/g, "\\n")
+        .replace(/,/g, "\\,")
+        .replace(/;/g, "\\;");
+
+    const websiteUrl = profile.website ? formatLink("website", profile.website) : "";
+    const linkedinUrl = profile.linkedin ? formatLink("linkedin", profile.linkedin) : "";
+
+    const nameParts = profile.name?.trim().split(/\s+/) || [];
+    const firstName = cleanText(nameParts.slice(0, -1).join(" ") || profile.name);
+    const lastName = cleanText(nameParts.slice(-1).join(" ") || "");
+    const fullName = cleanText(profile.name);
+
+    const lines = [
+      "BEGIN:VCARD",
+      "VERSION:3.0",
+      `FN:${fullName}`,
+      `N:${lastName};${firstName};;;`,
+      profile.subtitle ? `TITLE:${cleanText(profile.subtitle)}` : "",
+      profile.email ? `EMAIL;TYPE=INTERNET:${profile.email}` : "",
+      profile.phone ? `TEL;TYPE=CELL:${profile.phone}` : "",
+      websiteUrl ? `URL:${websiteUrl}` : "",
+      linkedinUrl ? `URL:${linkedinUrl}` : "",
+      profile.bio ? `NOTE:${cleanText(profile.bio)}` : "",
+      "END:VCARD",
+    ].filter(Boolean);
+
+    return lines.join("\r\n");
+  };
+
+  const downloadVCard = () => {
+    const vcard = buildVCard();
+    if (!vcard) return;
+
+    const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(profile?.name || "contact").replace(/\s+/g, "-").toLowerCase()}.vcf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    window.URL.revokeObjectURL(url);
+  };
+
+  const goToPreviousSlide = () => {
+    setCurrentIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
+  };
+
+  const goToNextSlide = () => {
+    setCurrentIndex((prev) => (prev + 1) % gallery.length);
+  };
+
+  const goToPreviousModal = () => {
+    setModalIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
+  };
+
+  const goToNextModal = () => {
+    setModalIndex((prev) => (prev + 1) % gallery.length);
+  };
+
   if (!profile) {
     return (
       <div
@@ -173,38 +287,17 @@ function Index() {
   }[] = [
     { key: "instagram", label: "Instagram", icon: <InstagramIcon className="size-[18px]" /> },
     { key: "tiktok", label: "TikTok", icon: <TikTokIcon className="size-[18px]" /> },
+    { key: "linkedin", label: "LinkedIn", icon: <Linkedin className="size-[18px]" /> },
     { key: "website", label: "Website", icon: <Globe className="size-[18px]" /> },
     { key: "whatsapp", label: "WhatsApp", icon: <MessageCircle className="size-[18px]" /> },
     { key: "email", label: "Email", icon: <Mail className="size-[18px]" /> },
     { key: "phone", label: "Phone", icon: <Phone className="size-[18px]" /> },
   ];
 
-  const activeLinks = links.filter(({ key }) => profile[key]);
-
-  const formatLink = (key: keyof ProfileData, value: string) => {
-    if (!value) return "#";
-
-    switch (key) {
-      case "instagram":
-        return value.startsWith("http")
-          ? value
-          : `https://instagram.com/${value.replace("@", "")}`;
-      case "tiktok":
-        return value.startsWith("http")
-          ? value
-          : `https://www.tiktok.com/@${value.replace("@", "")}`;
-      case "website":
-        return value.startsWith("http") ? value : `https://${value}`;
-      case "whatsapp":
-        return `https://wa.me/${value.replace(/\D/g, "")}`;
-      case "email":
-        return `mailto:${value}`;
-      case "phone":
-        return `tel:${value}`;
-      default:
-        return value;
-    }
-  };
+  const activeLinks = links.filter(({ key }) => {
+    const value = profile[key];
+    return typeof value === "string" && value.trim() !== "";
+  });
 
   const bgStyle: React.CSSProperties =
     profile.background_type === "image"
@@ -219,22 +312,6 @@ function Index() {
 
   const overlayOpacity = (profile.background_opacity ?? 45) / 100;
 
-  const goToPreviousSlide = () => {
-    setCurrentIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
-  };
-
-  const goToNextSlide = () => {
-    setCurrentIndex((prev) => (prev + 1) % gallery.length);
-  };
-
-  const goToPreviousModal = () => {
-    setModalIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
-  };
-
-  const goToNextModal = () => {
-    setModalIndex((prev) => (prev + 1) % gallery.length);
-  };
-
   return (
     <div className="relative min-h-screen" style={bgStyle}>
       {profile.background_type === "image" && (
@@ -246,14 +323,12 @@ function Index() {
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:py-16">
         <main className="glass-panel animate-in fade-in slide-in-from-bottom-4 w-full max-w-sm rounded-[2rem] p-6 text-card-foreground duration-700 sm:p-8">
-          {/* Hero */}
           <div className="flex flex-col items-center text-center">
             <div className="photo-ring h-40 w-40 overflow-hidden rounded-full sm:h-48 sm:w-48">
               <img
                 src={
                   profile.photo_url ||
-                  "https://ui-avatars.com/api/?name=" +
-                    encodeURIComponent(profile.name)
+                  "https://ui-avatars.com/api/?name=" + encodeURIComponent(profile.name)
                 }
                 alt={profile.name}
                 className="h-full w-full object-cover"
@@ -272,7 +347,6 @@ function Index() {
             </p>
           </div>
 
-          {/* Liens */}
           {activeLinks.length > 0 && (
             <div className="mt-6 flex w-full flex-col gap-3">
               {activeLinks.map(({ key, label, icon }) => {
@@ -310,14 +384,22 @@ function Index() {
             </div>
           )}
 
-          {/* Galerie */}
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={downloadVCard}
+              className="w-full rounded-2xl border border-border/70 bg-card/85 px-4 py-3.5 text-sm font-semibold text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card hover:shadow-md active:scale-[0.98]"
+            >
+              Enregistrer le contact
+            </button>
+          </div>
+
           {gallery.length > 0 && (
             <div className="mt-8">
               <h2 className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Gallery
               </h2>
 
-              {/* Carrousel */}
               <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border/60 bg-card/50 shadow-sm">
                 <img
                   src={gallery[currentIndex].image_url}
@@ -330,7 +412,6 @@ function Index() {
                   }}
                 />
 
-                {/* Flèche gauche */}
                 <button
                   onClick={goToPreviousSlide}
                   className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
@@ -348,7 +429,6 @@ function Index() {
                   </svg>
                 </button>
 
-                {/* Flèche droite */}
                 <button
                   onClick={goToNextSlide}
                   className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
@@ -366,7 +446,6 @@ function Index() {
                   </svg>
                 </button>
 
-                {/* Points indicateurs */}
                 <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
                   {gallery.map((_, i) => (
                     <button
@@ -382,7 +461,6 @@ function Index() {
                 </div>
               </div>
 
-              {/* Modal */}
               {modalOpen && (
                 <div
                   className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
@@ -395,7 +473,6 @@ function Index() {
                     className="relative max-h-[90vh] max-w-[90vw]"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {/* Fermer */}
                     <button
                       onClick={() => setModalOpen(false)}
                       className="absolute -top-3 -right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm hover:bg-white/40"
@@ -413,7 +490,6 @@ function Index() {
                       </svg>
                     </button>
 
-                    {/* Précédente dans la modal */}
                     {gallery.length > 1 && (
                       <button
                         onClick={goToPreviousModal}
@@ -433,7 +509,6 @@ function Index() {
                       </button>
                     )}
 
-                    {/* Suivante dans la modal */}
                     {gallery.length > 1 && (
                       <button
                         onClick={goToNextModal}
@@ -470,7 +545,6 @@ function Index() {
             </div>
           )}
 
-          {/* Footer */}
           <footer className="mt-8 pb-2 text-center">
             <p className="text-[11px] text-muted-foreground">
               {profile.name} — Personal Profile
