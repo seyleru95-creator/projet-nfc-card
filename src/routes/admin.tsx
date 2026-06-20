@@ -1,21 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error("Variables Supabase manquantes");
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-const ADMIN_PASSWORD = "123";
-const PROFILE_ID = "63f004d7-46e9-4f4f-8e23-a4fba1118bde";
+import { supabase } from "../lib/supabase";
 
 type ProfileData = {
   id: string;
+  user_id: string;
+  slug: string;
   name: string;
   subtitle: string;
   bio: string;
@@ -43,46 +33,83 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminPage() {
-  const [authOk, setAuthOk] = useState(false);
-  const [pw, setPw] = useState("");
-  const [err, setErr] = useState("");
+  // --------------------------------------------------
+  // Logique globale :
+  // 1. Vérifier si un utilisateur Supabase est connecté
+  // 2. Si non, rediriger vers /auth
+  // 3. Si oui, afficher le vrai dashboard admin
+  // 4. Toutes les données sont chargées selon le user connecté
+  // --------------------------------------------------
 
-  if (!authOk) {
+  const navigate = useNavigate();
+
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    checkAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        navigate({ to: "/auth" });
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function checkAuth() {
+    const { data: sessionData } = await supabase.auth.getSession();
+
+    if (!sessionData.session) {
+      navigate({ to: "/auth" });
+      return;
+    }
+
+    const { data: userData, error } = await supabase.auth.getUser();
+
+    if (error || !userData.user) {
+      navigate({ to: "/auth" });
+      return;
+    }
+
+    setUserId(userData.user.id);
+    setCheckingAuth(false);
+  }
+
+  if (checkingAuth) {
     return (
       <div style={styles.authWrapper}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (pw === ADMIN_PASSWORD) {
-              setAuthOk(true);
-              setErr("");
-            } else {
-              setErr("Code incorrect");
-            }
-          }}
-          style={styles.authForm}
-        >
-          <h1 style={styles.authTitle}>Admin</h1>
-          <input
-            type="password"
-            placeholder="Code admin"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            style={styles.input}
-          />
-          {err && <p style={styles.errText}>{err}</p>}
-          <button type="submit" style={styles.btnPrimary}>
-            Entrer
-          </button>
-        </form>
+        <div style={styles.authForm}>
+          <h1 style={styles.authTitle}>Vérification...</h1>
+          <p style={{ color: "#cbd5e1", margin: 0, textAlign: "center" }}>
+            Connexion en cours.
+          </p>
+        </div>
       </div>
     );
   }
 
-  return <AdminDashboard />;
+  if (!userId) {
+    return null;
+  }
+
+  return <AdminDashboard userId={userId} />;
 }
 
-function AdminDashboard() {
+function AdminDashboard({ userId }: { userId: string }) {
+  // --------------------------------------------------
+  // Logique globale :
+  // 1. Charger le profil du user connecté
+  // 2. Charger la galerie liée à ce profil
+  // 3. Sauvegarder les changements sans ID en dur
+  // 4. Garder l'interface existante pour ne pas casser ton flow
+  // --------------------------------------------------
+
+  const navigate = useNavigate();
+
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [saving, setSaving] = useState(false);
@@ -101,14 +128,21 @@ function AdminDashboard() {
 
   useEffect(() => {
     loadProfile();
-    loadGallery();
-  }, []);
+  }, [userId]);
+
+  useEffect(() => {
+    if (profile?.id) {
+      loadGallery(profile.id);
+    }
+  }, [profile?.id]);
 
   async function loadProfile() {
+    setMsg("");
+
     const { data, error } = await supabase
       .from("profile")
       .select("*")
-      .eq("id", PROFILE_ID)
+      .eq("user_id", userId)
       .single();
 
     if (error) {
@@ -119,6 +153,8 @@ function AdminDashboard() {
 
     const normalized: ProfileData = {
       id: data.id,
+      user_id: data.user_id,
+      slug: data.slug || "",
       name: data.name || "",
       subtitle: data.subtitle || "",
       bio: data.bio || "",
@@ -163,10 +199,11 @@ function AdminDashboard() {
     }
   }
 
-  async function loadGallery() {
+  async function loadGallery(profileId: string) {
     const { data, error } = await supabase
       .from("gallery")
       .select("*")
+      .eq("profile_id", profileId)
       .order("id", { ascending: false });
 
     if (error) {
@@ -200,7 +237,8 @@ function AdminDashboard() {
     const { error } = await supabase
       .from("profile")
       .update(payload)
-      .eq("id", PROFILE_ID);
+      .eq("id", profile.id)
+      .eq("user_id", userId);
 
     setSaving(false);
 
@@ -212,8 +250,10 @@ function AdminDashboard() {
   }
 
   async function uploadAvatar(file: File) {
+    if (!profile) return;
+
     const ext = file.name.split(".").pop();
-    const path = `avatars/profile.${ext}`;
+    const path = `avatars/${profile.id}.${ext}`;
 
     const { error: upErr } = await supabase.storage
       .from("profile")
@@ -230,7 +270,8 @@ function AdminDashboard() {
     const { error } = await supabase
       .from("profile")
       .update({ photo_url })
-      .eq("id", PROFILE_ID);
+      .eq("id", profile.id)
+      .eq("user_id", userId);
 
     if (error) {
       setMsg("Erreur MAJ avatar : " + error.message);
@@ -242,7 +283,9 @@ function AdminDashboard() {
   }
 
   async function uploadGalleryPhoto(file: File) {
-    const path = `gallery/${Date.now()}_${file.name}`;
+    if (!profile) return;
+
+    const path = `gallery/${profile.id}-${Date.now()}-${file.name}`;
 
     const { error: upErr } = await supabase.storage
       .from("gallery")
@@ -256,6 +299,7 @@ function AdminDashboard() {
     const { data } = supabase.storage.from("gallery").getPublicUrl(path);
 
     const { error: dbErr } = await supabase.from("gallery").insert({
+      profile_id: profile.id,
       image_url: data.publicUrl,
       caption: newCaption || file.name,
     });
@@ -267,22 +311,36 @@ function AdminDashboard() {
 
     setNewCaption("");
     setMsg("Photo ajoutée !");
-    loadGallery();
+    loadGallery(profile.id);
   }
 
   async function deleteGalleryItem(item: GalleryItem) {
+    if (!profile) return;
+
     const urlParts = item.image_url.split("/gallery/");
 
     if (urlParts[1]) {
       await supabase.storage.from("gallery").remove([urlParts[1]]);
     }
 
-    await supabase.from("gallery").delete().eq("id", item.id);
+    const { error } = await supabase
+      .from("gallery")
+      .delete()
+      .eq("id", item.id)
+      .eq("profile_id", profile.id);
+
+    if (error) {
+      setMsg("Erreur suppression : " + error.message);
+      return;
+    }
+
     setGallery((g) => g.filter((x) => x.id !== item.id));
     setMsg("Photo supprimée");
   }
 
   async function saveBg() {
+    if (!profile) return;
+
     let value = "";
 
     if (bgType === "solid") {
@@ -303,10 +361,22 @@ function AdminDashboard() {
         background_value: value,
         background_opacity: bgOpacity,
       })
-      .eq("id", PROFILE_ID);
+      .eq("id", profile.id)
+      .eq("user_id", userId);
 
     if (error) setMsg("Erreur fond : " + error.message);
     else setMsg("Fond sauvegardé !");
+  }
+
+  async function handleLogout() {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      setMsg("Erreur déconnexion : " + error.message);
+      return;
+    }
+
+    navigate({ to: "/auth" });
   }
 
   const bgPreview =
@@ -351,34 +421,31 @@ function AdminDashboard() {
       >
         <h1 style={{ ...styles.h1, marginBottom: 0 }}>Paramètres du profil</h1>
 
-        <Link
-          to="/"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            background: "#334155",
-            color: "white",
-            borderRadius: 8,
-            padding: "8px 14px",
-            fontSize: 13,
-            fontWeight: 500,
-            textDecoration: "none",
-          }}
-        >
-          <svg
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-            style={{ width: 15, height: 15 }}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link
+            to="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "#334155",
+              color: "white",
+              borderRadius: 8,
+              padding: "8px 14px",
+              fontSize: 13,
+              fontWeight: 500,
+              textDecoration: "none",
+            }}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          Voir le profil
-        </Link>
+            Voir le profil
+          </Link>
+
+          <button type="button" onClick={handleLogout} style={styles.btnSecondary}>
+            Déconnexion
+          </button>
+        </div>
       </div>
 
       <section style={styles.card}>
@@ -440,7 +507,13 @@ function AdminDashboard() {
         </button>
 
         {msg !== "" && (
-          <p style={{ color: msg.toLowerCase().includes("erreur") ? "#fca5a5" : "#86efac", marginTop: 8, fontSize: 13 }}>
+          <p
+            style={{
+              color: msg.toLowerCase().includes("erreur") ? "#fca5a5" : "#86efac",
+              marginTop: 8,
+              fontSize: 13,
+            }}
+          >
             {msg}
           </p>
         )}
@@ -538,10 +611,12 @@ function AdminDashboard() {
                 id="bg-upload"
                 style={{ display: "none" }}
                 onChange={async (e) => {
+                  if (!profile) return;
+
                   const file = e.target.files?.[0];
                   if (!file) return;
 
-                  const path = `backgrounds/bg-${Date.now()}-${file.name}`;
+                  const path = `backgrounds/${profile.id}-${Date.now()}-${file.name}`;
 
                   const { data, error } = await supabase.storage
                     .from("profile")
@@ -698,6 +773,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    padding: 24,
   },
   authForm: {
     background: "#1e293b",
@@ -706,7 +782,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: 12,
-    width: 280,
+    width: 320,
   },
   authTitle: {
     color: "white",
@@ -769,8 +845,8 @@ const styles: Record<string, React.CSSProperties> = {
     color: "white",
     border: "none",
     borderRadius: 8,
-    padding: "6px 12px",
-    fontSize: 13,
+    padding: "8px 16px",
+    fontSize: 14,
     cursor: "pointer",
   },
   errText: {
