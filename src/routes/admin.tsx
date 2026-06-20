@@ -423,22 +423,15 @@ function AdminDashboard({ userId }: { userId: string }) {
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <Link
-            to="/"
+            to="/$slug"
+            params={{ slug: profile.slug }}
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              background: "#334155",
-              color: "white",
-              borderRadius: 8,
-              padding: "8px 14px",
-              fontSize: 13,
-              fontWeight: 500,
-              textDecoration: "none",
-            }}
+            className="inline-flex items-center gap-2 rounded-2xl border border-border/70 bg-card/65 px-4 py-2.5 text-sm font-medium text-card-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card/85 hover:shadow-md"
           >
+            <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
             Voir le profil
           </Link>
 
