@@ -53,8 +53,12 @@ export const Route = createFileRoute("/$slug")({
       },
     ],
     meta: [
-      { title: "Profile" },
+      { title: (profile) => profile?.name || "Profile" },
+      { name: "description", content: (profile) => `${profile?.name || ""} ${profile?.subtitle || ""}`.trim() },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: (profile) => profile?.name || "Profile" },
+      { property: "og:description", content: (profile) => `${profile?.name || ""} ${profile?.subtitle || ""}`.trim() },
+      { property: "og:image", content: (profile) => profile?.photo_url || "" },
     ],
   }),
   component: SlugProfilePage,
@@ -105,7 +109,7 @@ function SlugProfilePage() {
 
   const { slug } = Route.useParams();
 
-  const SLIDE_INTERVAL = 3000;
+  const SLIDE_INTERVAL = 4000;
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);

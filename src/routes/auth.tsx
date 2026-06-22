@@ -88,41 +88,72 @@ function AuthPage() {
           Connecte-toi avec l’adresse email et le mot de passe du client pour accéder au back-office.
         </p>
 
-        <form onSubmit={handleLogin} style={styles.form}>
-          <div style={styles.field}>
-            <label style={styles.label}>Email</label>
-            <input
-              type="email"
-              placeholder="client@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={styles.input}
-              required
-            />
+          <form onSubmit={handleLogin} style={styles.form}>
+            <div style={styles.field}>
+              <label style={styles.label}>Email</label>
+              <input
+                type="email"
+                placeholder="client@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={styles.input}
+                required
+              />
+            </div>
+
+            <div style={styles.field}>
+              <label style={styles.label}>Mot de passe</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={styles.input}
+                required
+              />
+            </div>
+
+            {error ? <p style={styles.error}>{error}</p> : null}
+
+            <button type="submit" style={styles.button} disabled={loading}>
+              {loading ? "Connexion..." : "Se connecter"}
+            </button>
+          </form>
+          
+          <div style={{ marginTop: 24, textAlign: "center" }}>
+            <p style={{ color: "#cbd5e1", fontSize: "14px", marginBottom: "12px" }}>
+              Nouveau client? écrivez-nous
+            </p>
+            <a
+              href="https://wa.me/41799384082"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                backgroundColor: "#25D366",
+                color: "white",
+                padding: "12px 20px",
+                borderRadius: "12px",
+                fontSize: "14px",
+                fontWeight: "600",
+                textDecoration: "none",
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+            >
+              Contactez-nous
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20.1 3.9C17.9 1.7 15 .5 12 .5C5.8.5.7 5.6.7 11.9c0 2 .5 3.9 1.5 5.6L.6 23.4l6-1.6c1.7.9 3.5 1.3 5.2 1l1.6-6.4c1.7 1 3.6 1.5 5.6 1.5c6.9 0 12.5-5.6 12.5-12.5.1-2.1-.4-4.1-1-5.9zM12 21c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8z" fill="currentColor"/>
+              </svg>
+            </a>
           </div>
-
-          <div style={styles.field}>
-            <label style={styles.label}>Mot de passe</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={styles.input}
-              required
-            />
-          </div>
-
-          {error ? <p style={styles.error}>{error}</p> : null}
-
-          <button type="submit" style={styles.button} disabled={loading}>
-            {loading ? "Connexion..." : "Se connecter"}
-          </button>
-        </form>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
