@@ -1,42 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Globe, Linkedin, Mail, MessageCircle, Phone } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error("Variables Supabase manquantes");
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-type ProfileData = {
-  id: string;
-  slug: string;
-  name: string;
-  subtitle: string;
-  bio: string;
-  photo_url: string;
-  instagram: string;
-  tiktok: string;
-  linkedin: string;
-  website: string;
-  whatsapp: string;
-  email: string;
-  phone: string;
-  background_type: "solid" | "gradient" | "image";
-  background_value: string;
-  background_opacity: number;
-};
-
-type GalleryItem = {
-  id: string;
-  profile_id: string;
-  image_url: string;
-  caption: string;
-};
+import { supabase } from "@/lib/supabase";
+import { ProfileData, GalleryItem } from "@/types/profile";
+import { formatLink, buildVCard } from "@/lib/profile-utils";
 
 export const Route = createFileRoute("/$slug")({
   head: () => ({
@@ -53,12 +20,11 @@ export const Route = createFileRoute("/$slug")({
       },
     ],
     meta: [
-      { title: (profile) => profile?.name || "Profile" },
-      { name: "description", content: (profile) => `${profile?.name || ""} ${profile?.subtitle || ""}`.trim() },
+      { title: "Profile" },
+      { name: "description", content: "Carte de profil NFC" },
       { name: "twitter:card", content: "summary_large_image" },
-      { property: "og:title", content: (profile) => profile?.name || "Profile" },
-      { property: "og:description", content: (profile) => `${profile?.name || ""} ${profile?.subtitle || ""}`.trim() },
-      { property: "og:image", content: (profile) => profile?.photo_url || "" },
+      { property: "og:title", content: "Profile" },
+      { property: "og:description", content: "Carte de profil NFC" },
     ],
   }),
   component: SlugProfilePage,
@@ -166,7 +132,7 @@ function SlugProfilePage() {
   }
 
   useEffect(() => {
-    if (gallery.length === 0 || modalOpen) return;
+    if (gallery.length <= 1 || modalOpen) return;
 
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % gallery.length);
@@ -194,79 +160,8 @@ function SlugProfilePage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [modalOpen, gallery.length]);
 
-  const formatLink = (key: keyof ProfileData, value: string) => {
-    if (!value) return "#";
-
-    switch (key) {
-      case "instagram":
-        return value.startsWith("http")
-          ? value
-          : `https://instagram.com/${value.replace("@", "")}`;
-
-      case "tiktok":
-        return value.startsWith("http")
-          ? value
-          : `https://www.tiktok.com/@${value.replace("@", "")}`;
-
-      case "linkedin":
-        return value.startsWith("http")
-          ? value
-          : `https://www.linkedin.com/in/${value.replace(/^@/, "").replace(/^\/+/, "")}`;
-
-      case "website":
-        return value.startsWith("http") ? value : `https://${value}`;
-
-      case "whatsapp":
-        return `https://wa.me/${value.replace(/\D/g, "")}`;
-
-      case "email":
-        return `mailto:${value}`;
-
-      case "phone":
-        return `tel:${value}`;
-
-      default:
-        return value;
-    }
-  };
-
-  const buildVCard = () => {
-    if (!profile) return "";
-
-    const cleanText = (value?: string) =>
-      (value || "")
-        .replace(/\r\n/g, "\n")
-        .replace(/\n/g, "\\n")
-        .replace(/,/g, "\\,")
-        .replace(/;/g, "\\;");
-
-    const websiteUrl = profile.website ? formatLink("website", profile.website) : "";
-    const linkedinUrl = profile.linkedin ? formatLink("linkedin", profile.linkedin) : "";
-
-    const nameParts = profile.name?.trim().split(/\s+/) || [];
-    const firstName = cleanText(nameParts.slice(0, -1).join(" ") || profile.name);
-    const lastName = cleanText(nameParts.slice(-1).join(" ") || "");
-    const fullName = cleanText(profile.name);
-
-    const lines = [
-      "BEGIN:VCARD",
-      "VERSION:3.0",
-      `FN:${fullName}`,
-      `N:${lastName};${firstName};;;`,
-      profile.subtitle ? `TITLE:${cleanText(profile.subtitle)}` : "",
-      profile.email ? `EMAIL;TYPE=INTERNET:${profile.email}` : "",
-      profile.phone ? `TEL;TYPE=CELL:${profile.phone}` : "",
-      websiteUrl ? `URL:${websiteUrl}` : "",
-      linkedinUrl ? `URL:${linkedinUrl}` : "",
-      profile.bio ? `NOTE:${cleanText(profile.bio)}` : "",
-      "END:VCARD",
-    ].filter(Boolean);
-
-    return lines.join("\r\n");
-  };
-
   const downloadVCard = () => {
-    const vcard = buildVCard();
+    const vcard = buildVCard(profile);
     if (!vcard) return;
 
     const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
@@ -558,7 +453,11 @@ function SlugProfilePage() {
                         viewBox="0 0 24 24"
                         className="h-4 w-4"
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
 
@@ -618,9 +517,7 @@ function SlugProfilePage() {
           )}
 
           <footer className="mt-8 pb-2 text-center">
-            <p className="text-[11px] text-muted-foreground">
-              {profile.name} — Personal Profile
-            </p>
+            <p className="text-[11px] text-muted-foreground">{profile.name} — Personal Profile</p>
           </footer>
         </main>
       </div>

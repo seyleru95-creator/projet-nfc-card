@@ -1,240 +1,115 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { MessageCircle } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
+  head: () => ({
+    meta: [
+      { title: "Connexion - NFC Card Admin" },
+      {
+        name: "description",
+        content: "Accedez au back-office NFC Card pour gerer vos profils digitaux.",
+      },
+    ],
+  }),
   component: AuthPage,
 });
 
 function AuthPage() {
-  // --------------------------------------------------
-  // Logique globale de la page :
-  // 1. Si l'utilisateur est déjà connecté, on l'envoie vers /admin
-  // 2. Sinon on affiche un formulaire simple email + mot de passe
-  // 3. À la validation, on utilise Supabase Auth
-  // 4. En cas de succès, on redirige vers /admin
-  // --------------------------------------------------
-
-  const navigate = useNavigate();
-
+  const { loading, error, handleLogin } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [error, setError] = useState("");
 
-  useEffect(() => {
-    checkExistingSession();
-  }, []);
-
-  async function checkExistingSession() {
-    setCheckingSession(true);
-
-    const { data, error } = await supabase.auth.getSession();
-
-    if (!error && data.session) {
-      navigate({ to: "/admin" });
-      return;
-    }
-
-    setCheckingSession(false);
-  }
-
-  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
-
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !userData.user) {
-      setError("Connexion réussie, mais utilisateur introuvable.");
-      setLoading(false);
-      return;
-    }
-
-    navigate({ to: "/admin" });
-  }
-
-  if (checkingSession) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.card}>
-          <h1 style={styles.title}>Vérification de session...</h1>
-          <p style={styles.text}>Patiente une seconde.</p>
-        </div>
-      </div>
-    );
+    await handleLogin(email, password);
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <p style={styles.badge}>NFC Card Admin</p>
+    <div className="relative flex min-h-screen items-center justify-center overflow-x-hidden bg-[radial-gradient(circle_at_80%_20%,#1a2c4c_0%,#0b111e_60%)] px-5 py-10 text-white sm:px-6 sm:py-16">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute bottom-[10%] left-[5%] h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.15)_0%,rgba(0,0,0,0)_70%)]"
+      />
 
-        <h1 style={styles.title}>Connexion</h1>
-        <p style={styles.text}>
-          Connecte-toi avec l’adresse email et le mot de passe du client pour accéder au back-office.
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center backdrop-blur-md shadow-[0_20px_60px_rgba(0,0,0,0.35)] sm:p-10">
+        <p className="mb-4 text-base font-bold uppercase tracking-[0.2em] text-sky-300 sm:text-lg">
+          NFC Card Admin
         </p>
 
-          <form onSubmit={handleLogin} style={styles.form}>
-            <div style={styles.field}>
-              <label style={styles.label}>Email</label>
-              <input
-                type="email"
-                placeholder="client@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                style={styles.input}
-                required
-              />
-            </div>
+        <h1 className="mb-3 text-3xl font-bold tracking-tight sm:text-4xl">Connexion</h1>
+        <p className="mx-auto mb-8 max-w-sm text-sm leading-relaxed text-slate-400 sm:text-base">
+          Connecte-toi avec ton adresse email et ton mot de passe pour acceder au back-office.
+        </p>
 
-            <div style={styles.field}>
-              <label style={styles.label}>Mot de passe</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={styles.input}
-                required
-              />
-            </div>
+        <form onSubmit={onSubmit} className="flex flex-col gap-5 text-left" noValidate>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="email" className="text-sm font-semibold text-slate-200">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="client@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition-all focus:border-sky-300/50 focus:ring-2 focus:ring-sky-300/20"
+            />
+          </div>
 
-            {error ? <p style={styles.error}>{error}</p> : null}
+          <div className="flex flex-col gap-2">
+            <label htmlFor="password" className="text-sm font-semibold text-slate-200">
+              Mot de passe
+            </label>
+            <input
+              id="password"
+              type="password"
+              placeholder="********"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition-all focus:border-sky-300/50 focus:ring-2 focus:ring-sky-300/20"
+            />
+          </div>
 
-            <button type="submit" style={styles.button} disabled={loading}>
+          {error ? (
+            <p role="alert" className="text-center text-sm text-rose-300">
+              {error}
+            </p>
+          ) : null}
+
+          <div className="group relative mt-2">
+            <div
+              aria-hidden
+              className="absolute inset-0 rounded-[30px] bg-gradient-to-r from-sky-200 to-sky-400 opacity-40 blur-[15px] transition-opacity duration-300 group-hover:opacity-60"
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="relative inline-flex w-full items-center justify-center gap-2.5 rounded-[30px] bg-gradient-to-r from-sky-100 to-sky-200 px-9 py-4 text-base font-semibold text-slate-900 transition-all duration-200 hover:scale-[1.01] hover:from-sky-50 hover:to-sky-100 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
+            >
               {loading ? "Connexion..." : "Se connecter"}
             </button>
-          </form>
-          
-          <div style={{ marginTop: 24, textAlign: "center" }}>
-            <p style={{ color: "#cbd5e1", fontSize: "14px", marginBottom: "12px" }}>
-              Nouveau client? écrivez-nous
-            </p>
-            <a
-              href="https://wa.me/41799384082"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: "#25D366",
-                color: "white",
-                padding: "12px 20px",
-                borderRadius: "12px",
-                fontSize: "14px",
-                fontWeight: "600",
-                textDecoration: "none",
-                border: "none",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-            >
-              Contactez-nous
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20.1 3.9C17.9 1.7 15 .5 12 .5C5.8.5.7 5.6.7 11.9c0 2 .5 3.9 1.5 5.6L.6 23.4l6-1.6c1.7.9 3.5 1.3 5.2 1l1.6-6.4c1.7 1 3.6 1.5 5.6 1.5c6.9 0 12.5-5.6 12.5-12.5.1-2.1-.4-4.1-1-5.9zM12 21c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8z" fill="currentColor"/>
-              </svg>
-            </a>
           </div>
+        </form>
+
+        <div className="mt-8 text-center">
+          <p className="mb-3 text-sm text-slate-400">Nouveau client ? ecrivez-nous</p>
+          <a
+            href="https://wa.me/41799384082"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2.5 rounded-2xl bg-[#25D366] px-7 py-4 text-base font-semibold text-white transition-all duration-200 hover:scale-[1.02] hover:bg-[#22c25e]"
+          >
+            <MessageCircle className="h-6 w-6" aria-hidden />
+            Contactez-nous
+          </a>
         </div>
       </div>
-    );
-  }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background:
-      "linear-gradient(135deg, #0f172a 0%, #111827 45%, #1e293b 100%)",
-    padding: "24px",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "420px",
-    background: "rgba(15, 23, 42, 0.88)",
-    border: "1px solid rgba(148, 163, 184, 0.18)",
-    borderRadius: "24px",
-    padding: "32px",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
-    backdropFilter: "blur(12px)",
-    color: "white",
-  },
-  badge: {
-    margin: "0 0 12px 0",
-    fontSize: "12px",
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    color: "#93c5fd",
-  },
-  title: {
-    margin: "0 0 10px 0",
-    fontSize: "30px",
-    fontWeight: 800,
-    lineHeight: 1.1,
-  },
-  text: {
-    margin: "0 0 24px 0",
-    color: "#cbd5e1",
-    fontSize: "15px",
-    lineHeight: 1.6,
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  field: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  label: {
-    fontSize: "14px",
-    fontWeight: 600,
-    color: "#e2e8f0",
-  },
-  input: {
-    width: "100%",
-    padding: "14px 16px",
-    borderRadius: "12px",
-    border: "1px solid #334155",
-    background: "#0f172a",
-    color: "white",
-    outline: "none",
-    fontSize: "15px",
-  },
-  button: {
-    marginTop: "8px",
-    padding: "14px 16px",
-    borderRadius: "12px",
-    border: "none",
-    background: "#2563eb",
-    color: "white",
-    fontSize: "15px",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  error: {
-    margin: 0,
-    color: "#fca5a5",
-    fontSize: "14px",
-  },
-};
+    </div>
+  );
+}
