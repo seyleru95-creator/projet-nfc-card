@@ -46,6 +46,7 @@ function SlugProfilePage() {
   const [modalIndex, setModalIndex] = useState(0);
 
   const [loading, setLoading] = useState(true);
+  const [galleryLoading, setGalleryLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
   const loadProfileBySlug = useCallback(async () => {
@@ -71,7 +72,9 @@ function SlugProfilePage() {
     }
 
     setProfile(profileData as ProfileData);
+    setLoading(false);
 
+    setGalleryLoading(true);
     const { data: galleryData, error: galleryError } = await supabase
       .from("gallery")
       .select("*")
@@ -84,8 +87,7 @@ function SlugProfilePage() {
     } else {
       setGallery((galleryData || []) as GalleryItem[]);
     }
-
-    setLoading(false);
+    setGalleryLoading(false);
   }, [slug]);
 
   useEffect(() => {
@@ -301,22 +303,26 @@ function SlugProfilePage() {
             </button>
           </div>
 
-          {gallery.length > 0 && (
+          {(gallery.length > 0 || galleryLoading) && (
             <div className="mt-8">
               <h2 className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Gallery
               </h2>
 
-              <GalleryCarousel
-                gallery={gallery}
-                currentIndex={currentIndex}
-                onNavigate={navigateSlide}
-                onDotClick={setCurrentIndex}
-                onImageClick={() => {
-                  setModalIndex(currentIndex);
-                  setModalOpen(true);
-                }}
-              />
+              {galleryLoading && gallery.length === 0 ? (
+                <div className="aspect-[4/3] w-full animate-pulse rounded-2xl bg-slate-700/30" />
+              ) : (
+                <GalleryCarousel
+                  gallery={gallery}
+                  currentIndex={currentIndex}
+                  onNavigate={navigateSlide}
+                  onDotClick={setCurrentIndex}
+                  onImageClick={() => {
+                    setModalIndex(currentIndex);
+                    setModalOpen(true);
+                  }}
+                />
+              )}
 
               <GalleryModal
                 gallery={gallery}

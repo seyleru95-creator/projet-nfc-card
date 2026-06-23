@@ -31,7 +31,7 @@ function LoadingShell({ title, subtitle }: { title: string; subtitle: string }) 
         aria-hidden
         className="pointer-events-none absolute bottom-[10%] left-[5%] h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.15)_0%,rgba(0,0,0,0)_70%)]"
       />
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/[0.04] p-10 text-center backdrop-blur-md shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/[0.04] p-10 text-center shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
         <p className="mb-4 text-base font-bold uppercase tracking-[0.2em] text-sky-300 sm:text-lg">
           NFC Card Admin
         </p>
@@ -178,7 +178,7 @@ function AdminPage() {
             params={{ slug: profile.slug }}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-white backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-300/30 hover:bg-white/[0.08] hover:shadow-md"
+            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-300/30 hover:bg-white/[0.08] hover:shadow-md"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Voir le profil
@@ -187,7 +187,7 @@ function AdminPage() {
           <button
             type="button"
             onClick={handleLogout}
-            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-white backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300/30 hover:bg-white/[0.08] hover:text-rose-200 hover:shadow-md"
+            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300/30 hover:bg-white/[0.08] hover:text-rose-200 hover:shadow-md"
           >
             <LogOut className="h-4 w-4" aria-hidden />
             Deconnexion

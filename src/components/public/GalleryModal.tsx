@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GalleryItem } from "@/types/profile";
 import { ChevronLeft, ChevronRight, CloseIcon } from "./icons";
 
@@ -20,6 +20,7 @@ export function GalleryModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const [imgState, setImgState] = useState<"loading" | "loaded" | "error">("loading");
 
   const getFocusableElements = useCallback(() => {
     if (!dialogRef.current) return [];
@@ -39,6 +40,10 @@ export function GalleryModal({
       previousFocusRef.current = null;
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    setImgState("loading");
+  }, [modalIndex, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -134,11 +139,25 @@ export function GalleryModal({
           </button>
         )}
 
-        <img
-          src={gallery[modalIndex].image_url}
-          alt={gallery[modalIndex].caption || `Photo ${modalIndex + 1}`}
-          className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
-        />
+        <div className="relative">
+          {imgState === "loading" && (
+            <div className="flex h-[50vh] w-[50vw] items-center justify-center rounded-2xl bg-slate-800/60">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+            </div>
+          )}
+          {imgState === "error" && (
+            <div className="flex h-[50vh] w-[50vw] items-center justify-center rounded-2xl bg-slate-800/60">
+              <span className="text-sm text-slate-500">Image indisponible</span>
+            </div>
+          )}
+          <img
+            src={gallery[modalIndex].image_url}
+            alt={gallery[modalIndex].caption || `Photo ${modalIndex + 1}`}
+            className={`max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl ${imgState === "loaded" ? "" : "opacity-0"}`}
+            onLoad={() => setImgState("loaded")}
+            onError={() => setImgState("error")}
+          />
+        </div>
 
         {gallery[modalIndex].caption && (
           <p className="mt-2 text-center text-sm text-white/80">{gallery[modalIndex].caption}</p>

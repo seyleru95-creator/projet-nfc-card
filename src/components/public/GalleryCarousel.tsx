@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { GalleryItem } from "@/types/profile";
 import { ChevronLeft, ChevronRight } from "./icons";
 
@@ -16,16 +17,30 @@ export function GalleryCarousel({
   onDotClick,
   onImageClick,
 }: GalleryCarouselProps) {
-  if (gallery.length === 0) return null;
+  const [imgState, setImgState] = useState<"loading" | "loaded" | "error">("loading");
+  const current = gallery[currentIndex];
+
+  useEffect(() => {
+    setImgState("loading");
+  }, [currentIndex]);
+
+  if (!current) return null;
 
   return (
     <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border/60 bg-card/50 shadow-sm">
+      {imgState === "loading" && <div className="absolute inset-0 animate-pulse bg-slate-700/40" />}
+      {imgState === "error" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-800/60">
+          <span className="text-xs text-slate-500">Image indisponible</span>
+        </div>
+      )}
       <img
-        src={gallery[currentIndex].image_url}
-        alt={gallery[currentIndex].caption || `Photo ${currentIndex + 1}`}
-        className="h-full w-full cursor-pointer object-cover transition-opacity duration-500"
-        loading="lazy"
+        src={current.image_url}
+        alt={current.caption || `Photo ${currentIndex + 1}`}
+        className={`h-full w-full cursor-pointer object-cover transition-opacity duration-500 ${imgState === "loaded" ? "" : "opacity-0"}`}
         onClick={onImageClick}
+        onLoad={() => setImgState("loaded")}
+        onError={() => setImgState("error")}
       />
 
       <button

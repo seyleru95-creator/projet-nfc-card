@@ -1,5 +1,5 @@
-import { useCallback, useRef } from "react";
-import { ImagePlus, Trash2 } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { ImagePlus, Trash2, ImageIcon } from "lucide-react";
 import { GalleryItem } from "@/types/profile";
 
 interface GalleryManagerProps {
@@ -9,6 +9,29 @@ interface GalleryManagerProps {
   onUploadGalleryPhoto: (file: File, caption: string) => Promise<void>;
   onDeleteGalleryItem: (itemId: string) => Promise<void>;
   saving: boolean;
+}
+
+function GalleryImage({ src, alt }: { src: string; alt: string }) {
+  const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
+
+  return (
+    <div className="relative h-32 w-full">
+      {state === "loading" && <div className="absolute inset-0 animate-pulse bg-slate-700/50" />}
+      {state === "error" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-800/60">
+          <ImageIcon className="h-8 w-8 text-slate-600" aria-hidden />
+        </div>
+      )}
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        className={`h-full w-full object-cover ${state === "loaded" ? "" : "opacity-0"}`}
+        onLoad={() => setState("loaded")}
+        onError={() => setState("error")}
+      />
+    </div>
+  );
 }
 
 export function GalleryManager({
@@ -33,7 +56,7 @@ export function GalleryManager({
   );
 
   return (
-    <section className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.2)] sm:p-8">
+    <section className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.2)] sm:p-8">
       <h2 className="mb-6 text-xl font-semibold text-sky-300">Galerie</h2>
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -76,12 +99,7 @@ export function GalleryManager({
             key={item.id}
             className="group/item relative overflow-hidden rounded-xl border border-white/10 bg-slate-950/40 transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-300/30 hover:shadow-md"
           >
-            <img
-              src={item.image_url}
-              alt={item.caption}
-              loading="lazy"
-              className="h-32 w-full object-cover"
-            />
+            <GalleryImage src={item.image_url} alt={item.caption} />
             <div className="truncate bg-black/50 px-3 py-1.5 text-center text-xs text-white">
               {item.caption}
             </div>

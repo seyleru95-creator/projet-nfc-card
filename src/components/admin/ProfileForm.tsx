@@ -40,6 +40,10 @@ const inputClass =
 export function ProfileForm({ profile, onSave, onUploadAvatar, saving }: ProfileFormProps) {
   const [draft, setDraft] = useState<ProfileData>(profile);
   const avatarRef = useRef<HTMLInputElement>(null);
+  const [avatarState, setAvatarState] = useState<"loading" | "loaded">("loading");
+  const [avatarSrc, setAvatarSrc] = useState(
+    profile.photo_url || "https://ui-avatars.com/api/?name=Admin",
+  );
 
   const profileFields = useMemo<EditableField[]>(
     () => [
@@ -80,15 +84,25 @@ export function ProfileForm({ profile, onSave, onUploadAvatar, saving }: Profile
   );
 
   return (
-    <section className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.2)] sm:p-8">
+    <section className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.2)] sm:p-8">
       <h2 className="mb-6 text-xl font-semibold text-sky-300">Profil</h2>
 
       <div className="mb-6 flex items-center gap-5">
-        <img
-          src={profile.photo_url || "https://ui-avatars.com/api/?name=Admin"}
-          alt="avatar"
-          className="h-24 w-24 rounded-full border-[3px] border-sky-300/50 object-cover shadow-[0_4px_12px_rgba(56,189,248,0.3)]"
-        />
+        <div className="relative">
+          {avatarState === "loading" && (
+            <div className="h-24 w-24 animate-pulse rounded-full bg-slate-700/50" />
+          )}
+          <img
+            src={avatarSrc}
+            alt="avatar"
+            className={`h-24 w-24 rounded-full border-[3px] border-sky-300/50 object-cover shadow-[0_4px_12px_rgba(56,189,248,0.3)] ${avatarState === "loaded" ? "" : "hidden"}`}
+            onLoad={() => setAvatarState("loaded")}
+            onError={() => {
+              setAvatarSrc("https://ui-avatars.com/api/?name=Admin");
+              setAvatarState("loaded");
+            }}
+          />
+        </div>
         <div>
           <p className="mb-2 text-sm text-slate-400">Photo de profil</p>
           <input

@@ -24,7 +24,6 @@ interface BackgroundControlsProps {
 const styles: Record<string, React.CSSProperties> = {
   card: {
     background: "rgba(30, 41, 59, 0.6)",
-    backdropFilter: "blur(10px)",
     border: "1px solid rgba(148, 163, 184, 0.1)",
     borderRadius: 20,
     padding: 24,
