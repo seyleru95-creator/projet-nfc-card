@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { ProfileData } from "@/types/profile";
 import {
   BgType,
@@ -18,8 +19,6 @@ interface BackgroundControlsProps {
   profile: ProfileData;
   onSaveBackground: (payload: { type: BgType; value: string; opacity: number }) => Promise<void>;
   saving: boolean;
-  msg: string;
-  setMsg: (msg: string) => void;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -68,8 +67,6 @@ export function BackgroundControls({
   profile,
   onSaveBackground,
   saving,
-  msg,
-  setMsg,
 }: BackgroundControlsProps) {
   const initial = useMemo(() => parseBackground(profile), [profile]);
 
@@ -95,22 +92,20 @@ export function BackgroundControls({
   const handleImagePick = useCallback(
     async (file: File) => {
       try {
-        setMsg("");
         const publicUrl = await uploadBackgroundImage(file);
         setBgImageUrl(publicUrl);
-        setMsg("Image uploadee, cliquez Sauvegarder le fond.");
+        toast.success("Image uploadee, cliquez Sauvegarder le fond.");
       } catch (err) {
-        setMsg("Erreur upload image : " + (err instanceof Error ? err.message : String(err)));
+        toast.error("Erreur upload image");
       }
     },
-    [uploadBackgroundImage, setMsg],
+    [uploadBackgroundImage],
   );
 
   const handleSave = useCallback(async () => {
-    setMsg("");
     const value = buildBackgroundValue(bgType, bgColor1, bgColor2, bgDirection, bgImageUrl);
     await onSaveBackground({ type: bgType, value, opacity: bgOpacity });
-  }, [bgType, bgColor1, bgColor2, bgDirection, bgImageUrl, bgOpacity, onSaveBackground, setMsg]);
+  }, [bgType, bgColor1, bgColor2, bgDirection, bgImageUrl, bgOpacity, onSaveBackground]);
 
   const preview = useMemo(
     () => buildBackgroundPreview(bgType, bgColor1, bgColor2, bgDirection, bgImageUrl),
@@ -182,18 +177,6 @@ export function BackgroundControls({
       >
         {saving ? "Sauvegarde..." : "Sauvegarder le fond"}
       </button>
-
-      {msg && (
-        <p
-          style={{
-            color: msg.toLowerCase().includes("erreur") ? "#fca5a5" : "#86efac",
-            marginTop: 8,
-            fontSize: 13,
-          }}
-        >
-          {msg}
-        </p>
-      )}
     </section>
   );
 }

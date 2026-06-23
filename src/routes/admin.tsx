@@ -1,12 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, LogOut } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { toUserMessage } from "@/lib/error-message";
 import { useProfile } from "@/hooks/useProfile";
 import { useGallery } from "@/hooks/useGallery";
 import { ProfileForm } from "@/components/admin/ProfileForm";
 import { BackgroundControls } from "@/components/admin/BackgroundControls";
 import { GalleryManager } from "@/components/admin/GalleryManager";
+import { ProfileData } from "@/types/profile";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -44,7 +47,7 @@ function AdminPage() {
   const { userId, loading: checkingAuth, handleLogout } = useAuth();
   const {
     profile,
-    isLoading: isProfileLoading,
+    isPending: isProfileLoading,
     updateProfile,
     updateAvatar,
     updateBackground,
@@ -54,14 +57,13 @@ function AdminPage() {
   } = useProfile(userId || "");
   const {
     gallery,
-    isLoading: isGalleryLoading,
+    isPending: isGalleryLoading,
     addGalleryItem,
     deleteGalleryItem,
     isAddingGalleryItem,
     isDeletingGalleryItem,
   } = useGallery(profile?.id || "");
 
-  const [msg, setMsg] = useState("");
   const [newCaption, setNewCaption] = useState("");
 
   useEffect(() => {
@@ -89,55 +91,51 @@ function AdminPage() {
     isAddingGalleryItem ||
     isDeletingGalleryItem;
 
-  const saveProfile = async () => {
-    setMsg("");
+  const saveProfile = async (draft: ProfileData) => {
     try {
       await updateProfile({
-        name: profile.name || "",
-        subtitle: profile.subtitle || "",
-        bio: profile.bio || "",
-        instagram: profile.instagram || "",
-        tiktok: profile.tiktok || "",
-        linkedin: profile.linkedin || "",
-        website: profile.website || "",
-        whatsapp: profile.whatsapp || "",
-        email: profile.email || "",
-        phone: profile.phone || "",
+        name: draft.name || "",
+        subtitle: draft.subtitle || "",
+        bio: draft.bio || "",
+        instagram: draft.instagram || "",
+        tiktok: draft.tiktok || "",
+        linkedin: draft.linkedin || "",
+        website: draft.website || "",
+        whatsapp: draft.whatsapp || "",
+        email: draft.email || "",
+        phone: draft.phone || "",
       });
-      setMsg("Profil sauvegarde !");
+      toast.success("Profil sauvegarde !");
     } catch (err) {
-      setMsg("Erreur : " + (err instanceof Error ? err.message : String(err)));
+      toast.error(toUserMessage(err));
     }
   };
 
   const uploadAvatar = async (file: File) => {
-    setMsg("");
     try {
       await updateAvatar(file);
-      setMsg("Avatar mis a jour !");
+      toast.success("Avatar mis a jour !");
     } catch (err) {
-      setMsg("Erreur avatar : " + (err instanceof Error ? err.message : String(err)));
+      toast.error(toUserMessage(err));
     }
   };
 
   const uploadGalleryPhoto = async (file: File, caption: string) => {
-    setMsg("");
     try {
       await addGalleryItem({ file, caption });
       setNewCaption("");
-      setMsg("Photo ajoutee !");
+      toast.success("Photo ajoutee !");
     } catch (err) {
-      setMsg("Erreur galerie : " + (err instanceof Error ? err.message : String(err)));
+      toast.error(toUserMessage(err));
     }
   };
 
   const handleDeleteGalleryItem = async (itemId: string) => {
-    setMsg("");
     try {
       await deleteGalleryItem(itemId);
-      setMsg("Photo supprimee");
+      toast.success("Photo supprimee");
     } catch (err) {
-      setMsg("Erreur suppression : " + (err instanceof Error ? err.message : String(err)));
+      toast.error(toUserMessage(err));
     }
   };
 
@@ -146,12 +144,11 @@ function AdminPage() {
     value: string;
     opacity: number;
   }) => {
-    setMsg("");
     try {
       await updateBackground(payload);
-      setMsg("Fond sauvegarde !");
+      toast.success("Fond sauvegarde !");
     } catch (err) {
-      setMsg("Erreur fond : " + (err instanceof Error ? err.message : String(err)));
+      toast.error(toUserMessage(err));
     }
   };
 
@@ -202,16 +199,12 @@ function AdminPage() {
           onSave={saveProfile}
           onUploadAvatar={uploadAvatar}
           saving={isUpdatingProfile || isUpdatingAvatar}
-          msg={msg}
-          setMsg={setMsg}
         />
 
         <BackgroundControls
           profile={profile}
           onSaveBackground={saveBackground}
           saving={isUpdatingBackground}
-          msg={msg}
-          setMsg={setMsg}
         />
 
         <GalleryManager
@@ -221,7 +214,6 @@ function AdminPage() {
           onUploadGalleryPhoto={uploadGalleryPhoto}
           onDeleteGalleryItem={handleDeleteGalleryItem}
           saving={isAddingGalleryItem || isDeletingGalleryItem}
-          msg={msg}
         />
 
         {isSaving && (

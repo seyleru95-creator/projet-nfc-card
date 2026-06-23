@@ -8,7 +8,7 @@ export function useProfile(userId: string) {
   // Query to fetch profile data
   const {
     data: profile,
-    isLoading,
+    isPending,
     isError,
     error,
   } = useQuery<ProfileData | null, Error>({
@@ -128,7 +128,7 @@ export function useProfile(userId: string) {
 
   return {
     profile,
-    isLoading,
+    isPending,
     isError,
     error,
     updateProfile: updateProfileMutation.mutateAsync,

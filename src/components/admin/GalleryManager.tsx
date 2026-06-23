@@ -9,7 +9,6 @@ interface GalleryManagerProps {
   onUploadGalleryPhoto: (file: File, caption: string) => Promise<void>;
   onDeleteGalleryItem: (itemId: string) => Promise<void>;
   saving: boolean;
-  msg: string;
 }
 
 export function GalleryManager({
@@ -19,7 +18,6 @@ export function GalleryManager({
   onUploadGalleryPhoto,
   onDeleteGalleryItem,
   saving,
-  msg,
 }: GalleryManagerProps) {
   const galleryRef = useRef<HTMLInputElement>(null);
 
@@ -90,7 +88,7 @@ export function GalleryManager({
             <button
               type="button"
               onClick={() => onDeleteGalleryItem(item.id)}
-              className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-rose-500/80 text-white opacity-0 transition-all duration-200 hover:scale-110 hover:bg-rose-500 group-hover/item:opacity-100"
+              className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-rose-500/80 text-white opacity-70 transition-all duration-200 hover:scale-110 hover:bg-rose-500 hover:opacity-100"
               aria-label="Supprimer la photo"
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden />
@@ -103,14 +101,6 @@ export function GalleryManager({
         )}
       </div>
 
-      {msg && (
-        <p
-          role="status"
-          className={`mt-4 text-sm ${msg.toLowerCase().includes("erreur") ? "text-rose-300" : "text-emerald-300"}`}
-        >
-          {msg}
-        </p>
-      )}
     </section>
   );
 }

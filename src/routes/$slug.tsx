@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Globe, Linkedin, Mail, MessageCircle, Phone } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ProfileData, GalleryItem } from "@/types/profile";
 import { formatLink, buildVCard } from "@/lib/profile-utils";
+import { InstagramIcon, TikTokIcon } from "@/components/public/icons";
+import { GalleryCarousel } from "@/components/public/GalleryCarousel";
+import { GalleryModal } from "@/components/public/GalleryModal";
 
 export const Route = createFileRoute("/$slug")({
   head: () => ({
@@ -30,49 +33,7 @@ export const Route = createFileRoute("/$slug")({
   component: SlugProfilePage,
 });
 
-function InstagramIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-    </svg>
-  );
-}
-
-function TikTokIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
-    </svg>
-  );
-}
-
 function SlugProfilePage() {
-  // --------------------------------------------------
-  // Logique globale :
-  // 1. Récupérer le slug depuis l’URL
-  // 2. Charger le bon profil depuis Supabase avec ce slug
-  // 3. Charger uniquement la galerie liée à ce profil
-  // 4. Réutiliser le design actuel de ta carte publique
-  // --------------------------------------------------
-
   const { slug } = Route.useParams();
 
   const SLIDE_INTERVAL = 4000;
@@ -141,25 +102,6 @@ function SlugProfilePage() {
     return () => clearInterval(timer);
   }, [gallery, modalOpen]);
 
-  useEffect(() => {
-    if (!modalOpen || gallery.length === 0) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setModalOpen(false);
-      }
-      if (event.key === "ArrowLeft") {
-        setModalIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
-      }
-      if (event.key === "ArrowRight") {
-        setModalIndex((prev) => (prev + 1) % gallery.length);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [modalOpen, gallery.length]);
-
   const downloadVCard = () => {
     const vcard = buildVCard(profile);
     if (!vcard) return;
@@ -177,21 +119,19 @@ function SlugProfilePage() {
     window.URL.revokeObjectURL(url);
   };
 
-  const goToPreviousSlide = () => {
-    setCurrentIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
-  };
+  const navigateSlide = useCallback(
+    (direction: -1 | 1) => {
+      setCurrentIndex((prev) => (prev + direction + gallery.length) % gallery.length);
+    },
+    [gallery.length]
+  );
 
-  const goToNextSlide = () => {
-    setCurrentIndex((prev) => (prev + 1) % gallery.length);
-  };
-
-  const goToPreviousModal = () => {
-    setModalIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
-  };
-
-  const goToNextModal = () => {
-    setModalIndex((prev) => (prev + 1) % gallery.length);
-  };
+  const navigateModal = useCallback(
+    (direction: -1 | 1) => {
+      setModalIndex((prev) => (prev + direction + gallery.length) % gallery.length);
+    },
+    [gallery.length]
+  );
 
   if (loading) {
     return (
@@ -367,152 +307,24 @@ function SlugProfilePage() {
                 Gallery
               </h2>
 
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border/60 bg-card/50 shadow-sm">
-                <img
-                  src={gallery[currentIndex].image_url}
-                  alt={gallery[currentIndex].caption || `Photo ${currentIndex + 1}`}
-                  className="h-full w-full cursor-pointer object-cover transition-opacity duration-500"
-                  loading="lazy"
-                  onClick={() => {
-                    setModalIndex(currentIndex);
-                    setModalOpen(true);
-                  }}
-                />
+              <GalleryCarousel
+                gallery={gallery}
+                currentIndex={currentIndex}
+                onNavigate={navigateSlide}
+                onDotClick={setCurrentIndex}
+                onImageClick={() => {
+                  setModalIndex(currentIndex);
+                  setModalOpen(true);
+                }}
+              />
 
-                <button
-                  onClick={goToPreviousSlide}
-                  className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
-                  aria-label="Photo précédente"
-                  type="button"
-                >
-                  <svg
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-
-                <button
-                  onClick={goToNextSlide}
-                  className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
-                  aria-label="Photo suivante"
-                  type="button"
-                >
-                  <svg
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-
-                <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
-                  {gallery.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setCurrentIndex(i)}
-                      className={`h-1.5 rounded-full transition-all duration-300 ${
-                        i === currentIndex ? "w-4 bg-white" : "w-1.5 bg-white/50"
-                      }`}
-                      aria-label={`Aller à la photo ${i + 1}`}
-                      type="button"
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {modalOpen && (
-                <div
-                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-                  onClick={() => setModalOpen(false)}
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="Galerie photo"
-                >
-                  <div
-                    className="relative max-h-[90vh] max-w-[90vw]"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      onClick={() => setModalOpen(false)}
-                      className="absolute -top-3 -right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm hover:bg-white/40"
-                      type="button"
-                      aria-label="Fermer la galerie"
-                    >
-                      <svg
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        viewBox="0 0 24 24"
-                        className="h-4 w-4"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-
-                    {gallery.length > 1 && (
-                      <button
-                        onClick={goToPreviousModal}
-                        className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
-                        type="button"
-                        aria-label="Voir la photo précédente"
-                      >
-                        <svg
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          viewBox="0 0 24 24"
-                          className="h-4 w-4"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                        </svg>
-                      </button>
-                    )}
-
-                    {gallery.length > 1 && (
-                      <button
-                        onClick={goToNextModal}
-                        className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
-                        type="button"
-                        aria-label="Voir la photo suivante"
-                      >
-                        <svg
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          viewBox="0 0 24 24"
-                          className="h-4 w-4"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    )}
-
-                    <img
-                      src={gallery[modalIndex].image_url}
-                      alt={gallery[modalIndex].caption || `Photo ${modalIndex + 1}`}
-                      className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
-                    />
-
-                    {gallery[modalIndex].caption && (
-                      <p className="mt-2 text-center text-sm text-white/80">
-                        {gallery[modalIndex].caption}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
+              <GalleryModal
+                gallery={gallery}
+                modalIndex={modalIndex}
+                isOpen={modalOpen}
+                onClose={() => setModalOpen(false)}
+                onNavigate={navigateModal}
+              />
             </div>
           )}
 

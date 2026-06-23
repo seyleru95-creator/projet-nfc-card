@@ -1,317 +1,252 @@
 # Plan d'amélioration du projet NFC Card
 
-_Dernière revue : 2026-06-23 — passe 2 (Top 10 #3, #5, #10, CT-A, RS-C, props fantômes)._
+_Dernière revue : 2026-06-23 — passe 3 (revue exhaustive)._
 
 ## 1. Résumé global
 
 **Forces :**
-- TanStack Query v5 idiomatique dans `useProfile`/`useGallery`/`useAuth` (`mutateAsync`, `invalidateQueries`, `setQueryData`, `enabled`).
-- `useAuth` est désormais un `useQuery(["auth","user"])` branché sur `supabase.auth.onAuthStateChange` (invalidation auto des queries `profile` et `gallery`).
-- Types centralisés dans `src/types/profile.ts` et réutilisés partout.
-- `auth.tsx` ne tape plus `supabase` directement — il passe par `useAuth.handleLogin`.
-- Décomposition `admin.tsx` → 3 sous-composants, eux-mêmes éclatés : `BackgroundControls` (199) + 4 sous-composants mémoïsés dans `background/` (48–96), `ProfileForm` (184), `GalleryManager` (116).
-- `BackgroundControls` : vrai upload `supabase.storage.from("profile")` via `useBackgroundUploader` (plus de stub `FileReader`).
-- `router.tsx` : `defaultOptions` configurées (`staleTime: 30_000`, `retry: 1`, `refetchOnWindowFocus: true`).
-- Props fantômes nettoyés : `userId`/`setMsg` retirés des contrats `ProfileForm` / `GalleryManager` / `BackgroundControls`.
-- `$slug.tsx` n'a plus de fonction-form dans `head.meta`, plus de `buildVCard` local (passe à `lib/profile-utils.ts`).
+- Stack technique moderne : React 19, TanStack Router + Query v5, Supabase, Tailwind v4, shadcn/ui.
+- Types centralisés dans `src/types/profile.ts` — `ProfileData` et `GalleryItem` réutilisés partout.
+- Hooks personnalisés propres : `useAuth` (useQuery + onAuthStateChange), `useProfile`, `useGallery`, `useBackgroundUploader`.
+- Décomposition `admin.tsx` → 3 sous-composants, `BackgroundControls` → 4 sous-composants mémoïsés.
+- Upload réel Supabase Storage (avatars, gallery, backgrounds) — plus de stubs.
+- `router.tsx` configuré avec `defaultOptions` (staleTime 30s, retry 1, refetchOnWindowFocus).
+- CSS de qualité : OKLCH, glassmorphism, dark mode, `prefers-reduced-motion`.
+- Auth clean : `useAuth` synchro `onAuthStateChange`, invalidation auto des queries profile/gallery.
 
 **Faiblesses :**
-- Migration Tailwind non terminée : `BackgroundControls` (20+ blocs `style={{}}`), `ProfileForm` (3), `GalleryManager` (3) — encore beaucoup d'inline styles, mais réduit.
-- `BackgroundControls` à 199 lignes (cap 200 respecté, mais fragile) ; le bloc "couleur unie" du mode `solid` reste en JSX inline et mériterait d'être extrait en `BackgroundSolidPicker` symétrique aux autres pickers.
-- `$slug.tsx` (526 lignes) reste monolithique : carrousel + modale + état tout dans un seul composant.
-- `admin.tsx` fuit toujours `err.message` PostgREST via `setMsg("Erreur X : " + err.message)` — helper `toUserMessage` pas créé.
-- `useProfile`/`useGallery` exposent encore `isLoading` (alias deprecated de `isPending`).
-- `services/supabaseService.ts` reste dormant (194 lignes) — non câblé, mais IDOR corrigé.
-- `plan.md` coche des ✅ qui ne correspondent pas à la réalité du code.
+- `$slug.tsx` (526 lignes) monolithique : carrousel + modale + SVG dupliqués + navigation slide/modal dupliquée.
+- `admin.tsx` fuit `err.message` PostgREST en 5 endroits (info leakage).
+- `supabaseService.ts` (194 lignes) complètement dormant — hooks tapent `supabase` directement.
+- `ProfileForm.tsx` mute `Object.assign(profile, draft)` — anti-pattern React.
+- `useProfile`/`useGallery` utilisent `isLoading` (deprecated v5) au lieu de `isPending`.
+- `BackgroundControls.tsx` utilise des `style={{}}` massifs au lieu de Tailwind.
+- Pas de validation formulaire (`zod` + `react-hook-form` installés mais jamais utilisés).
+- Pas de password reset.
+- Pas de security headers (`vercel.json`), `.env` commité.
 
 **Risques :**
-- **Sécurité** : `supabaseService.deleteGalleryItem` omet `.eq("profile_id", profileId)` — régression latente. `$slug.tsx:120,135` log des erreurs Supabase brutes.
-- **UX** : labels non associés (`auth.tsx`), pas de focus states, upload background stub.
-- **Maintenabilité** : props fantômes (`void userId`, `void setMsg`), 5 fichiers `app.config.timestamp_*.js` orphelins à la racine.
+- **Sécurité** : `admin.tsx` expose des erreurs PostgREST brutes contenant des noms de tables/colonnes. `.env` tracké par git.
+- **Maintenabilité** : 194 lignes de code mort dans `supabaseService.ts`. 526 lignes monolithiques dans `$slug.tsx`.
+- **UX** : Modale `$slug.tsx` sans focus trap (a11y). Bouton delete galerie visible uniquement au hover (mobile incompatible).
+
+---
 
 ## 2. Problèmes détectés
 
-| Priorité | Catégorie | Fichier | Problème | Impact | Correction recommandée |
-|---|---|---|---|---|---|
-| Critique | Sécurité | `src/services/supabaseService.ts:179-184` | `deleteGalleryItem` filtre uniquement par `id`, pas par `profile_id` — IDOR latent | Élevé si jamais câblé | Ajouter `.eq("profile_id", profileId)` ; aligner avec `useGallery.ts:80-84` |
-| Critique | Sécurité | `src/routes/admin.tsx:61-63` | `navigate({ to: "/auth" })` appelé pendant le render → warning TanStack Router | Moyen (UX/SPA) | Déplacer dans `useEffect` ou utiliser `redirect()` dans `beforeLoad` de la route `/admin` |
-| Haute | Sécurité | `src/routes/auth.tsx` inputs sans `htmlFor`/id | Labels non associés aux champs (WCAG 1.3.1, 4.1.2) | Moyen (accessibilité) | Ajouter `id="email"`, `id="password"`, `<label htmlFor="...">` |
-| Haute | Architecture | `src/components/admin/BackgroundControls.tsx:359` | Composant à 359 lignes, dont 22 blocs inline styles + helpers `parseBackground`/`buildValue` non exportés | Élevé (maintenabilité) | Extraire `parseBackground`/`buildValue`/`bgPreview` vers `lib/profile-utils.ts` ; scinder en `<BackgroundColorPicker>` / `<BackgroundImagePicker>` |
-| Haute | Architecture | `src/components/admin/ProfileForm.tsx:229`, `GalleryManager.tsx:202` | Tous deux dépassent le cap 200 lignes | Moyen | Sortir les sous-blocs `AvatarPicker` de `ProfileForm` ; sortir `GalleryUploader`/`GalleryItem`/`GalleryGrid` de `GalleryManager` |
-| Haute | Architecture | `src/hooks/useAuth.ts` | Pas un `useQuery` — incohérent avec `useProfile`/`useGallery` ; pas d'`onAuthStateChange` | Moyen (fraîcheur session, stale JWT) | Convertir en `useQuery` (queryKey `["auth","user"]`), brancher `supabase.auth.onAuthStateChange` pour invalider la query |
-| Haute | Maintenabilité | `src/routes/$slug.tsx:4-13` | Double client Supabase (relit `import.meta.env` et instancie un 2e `createClient`) | Moyen (drift si env divergent) | Remplacer par `import { supabase } from "@/lib/supabase"` |
-| Haute | UX | `src/components/admin/BackgroundControls.tsx:123-136` | `handleImagePick` produit un `data:image/...` URL en mémoire, jamais uploadé sur Supabase | Élevé (la fonctionnalité est factice) | Implémenter l'upload réel vers `supabase.storage.from("profile")` puis `updateBackground({ type: "image", value: publicUrl })` |
-| Haute | UX | `src/routes/admin.tsx:101,111,122,132,146` | `setMsg("Erreur X : " + err.message)` — fuite de messages PostgREST | Moyen | Mapper les erreurs via un helper `toUserMessage(err)` ; logger le détail en `console.error` côté serveur uniquement |
-| Haute | UX | `src/components/admin/GalleryManager.tsx:81` | Pas de `loading="lazy"` sur les images de galerie | Faible-Moyen | Ajouter `loading="lazy"` |
-| Moyenne | Architecture | `src/components/admin/ProfileForm.tsx:48`, `BackgroundControls.tsx:70`, `GalleryManager.tsx:29-30` | Props inutilisés (`void userId`, `void setMsg`) | Faible (signal de refactoring incomplet) | Retirer des interfaces et des call sites |
-| Moyenne | UX | `src/components/admin/GalleryManager.tsx:108-112` | `<p style={{display:"none"}}>` avec `profile.id` — dead code + aria-hidden cassé | Faible | Supprimer |
-| Moyenne | UX | `src/routes/$slug.tsx:144-152` | `setInterval` du carrousel tourne même avec une seule image | Faible | Ajouter `if (gallery.length <= 1) return;` |
-| Moyenne | UX | `src/routes/auth.tsx:55` | `<p>` d'erreur sans `role="alert"` | Faible | `role="alert"` |
-| Moyenne | Sécurité | `src/routes/$slug.tsx:120,135` | `console.error` expose les erreurs Supabase brutes | Faible | Logger côté serveur / via le helper d'erreur ; retirer côté client |
-| Moyenne | Performance | `src/routes/admin.tsx:46-50` (`useState(msg)`) | Re-render des 3 enfants à chaque changement de message | Faible | Utiliser `sonner` (déjà en deps) ou `useReducer` local ; mémoïser les callbacks enfants |
-| Moyenne | Performance | `src/components/admin/GalleryManager.tsx:45` | `useMemo(() => gallery, [gallery])` — mémoïsation no-op | Aucun | Supprimer ou mémoïser un dérivé (`galleryWithUrls`) |
-| Faible | Maintenabilité | `src/services/supabaseService.ts` (184 lignes) | Code dormant mais avec IDOR — à réparer plutôt que supprimer | Aucun | Réparer `deleteGalleryItem` + `deleteProfile` pour aligner avec `useGallery.ts:80-84` |
-| Faible | Maintenabilité | `app.config.timestamp_*.js` × 5, `fix_admin.py` | Artefacts à la racine | Aucun | Supprimer / déplacer |
-| Faible | Performance | `src/hooks/useProfile.ts:11,131`, `useGallery.ts:11,95` | `useQuery` destructure `isLoading` (alias deprecated de `isPending`) | Aucun | Renommer en `isPending` (cohérence avec les mutations) |
-| Faible | Performance | `src/router.tsx:6` | `new QueryClient()` sans `defaultOptions` (pas de staleTime, retry, refetchOnWindowFocus) | Faible | Ajouter `defaultOptions.queries.staleTime: 30_000`, `retry: 1` |
-| Faible | Sécurité | pas de CSP / headers | Aucun `Content-Security-Policy` ni `vercel.json` headers | Faible (Vercel SPA) | Ajouter headers via `vercel.json` (`X-Content-Type-Options`, `Referrer-Policy`, CSP) |
-| Faible | Sécurité | pas de password reset | Pas de flow "mot de passe oublié" | UX | Ajouter une route `/auth/reset` ou un lien mailto |
+### Architecture
+
+| # | Fichier | Lignes | Problème | Impact | Correction |
+|---|---------|--------|----------|--------|------------|
+| A1 | `src/services/supabaseService.ts` | 1-194 | **Code mort** : jamais importé, duplique `useProfile`/`useGallery` | Élevé | Supprimer ou refondre les hooks pour l'utiliser |
+| A2 | `src/routes/$slug.tsx` | 67-526 | **Monolithique** : 526 lignes, carrousel + modale + 8 fonctions + SVG inline ×4 | Élevé | Extraire `GalleryCarousel`, `GalleryModal`, `InstagramIcon`, `TikTokIcon` en composants séparés |
+| A3 | `src/routes/$slug.tsx` | 180-194 | **Code dupliqué** : `goToPreviousSlide`/`goToNextSlide`/`goToPreviousModal`/`goToNextModal` identiques | Moyen | Fonction partagée `navigateSlide` avec paramètre direction + contexte |
+| A4 | `src/components/admin/ProfileForm.tsx` | 78 | **Mutation de props** : `Object.assign(profile, draft)` — anti-pattern React qui modifie l'objet parent | Élevé | Passer les modifications dans `onSave()` au lieu de muter |
+| A5 | `src/lib/profile-utils.ts` | 54-84 | **90% duplication** : `buildBackgroundValue` et `buildBackgroundPreview` quasi-identiques | Moyen | Consolider avec un paramètre `fallback` |
+
+### Sécurité
+
+| # | Fichier | Lignes | Problème | Impact | Correction |
+|---|---------|--------|----------|--------|------------|
+| S1 | `src/routes/admin.tsx` | 109, 119, 130, 140, 154 | **Fuite d'infos** : `err.message` PostgREST affiché à l'utilisateur (noms de tables, colonnes) | Critique | Créer `toUserMessage(err)` qui mappe les erreurs vers des messages safe |
+| S2 | `.env` | 1-2 | **Tracké par git** : `.env` commité avec clés Supabase | Moyen | `git rm --cached .env`, ajouter à `.gitignore`, documenter dans `.env.example` |
+| S3 | `vercel.json` | 1-8 | **Headers manquants** : pas de CSP, X-Content-Type-Options, Referrer-Policy | Faible | Ajouter `headers` dans `vercel.json` |
+| S4 | `src/routes/$slug.tsx` | 110, 125 | **Logs navigateur** : `console.error` expose erreurs Supabase au client | Faible | Remplacer par logger silencieux ou centralisé |
+| S5 | `eslint.config.js` | 36 | **Règle désactivée** : `@typescript-eslint/no-unused-vars: "off"` | Faible | Réactiver ou configurer avec `argsIgnorePattern: "^_"` |
+
+### UX / Accessibilité
+
+| # | Fichier | Lignes | Problème | Impact | Correction |
+|---|---------|--------|----------|--------|------------|
+| U1 | `src/routes/$slug.tsx` | 431-515 | **Pas de focus trap** dans la modale galerie | Moyen | Ajouter focus trap manuel ou utiliser `focus-trap-react` |
+| U2 | `src/components/admin/GalleryManager.tsx` | 90-97 | **Delete hover-only** : `group-hover/item:opacity-100` — invisible sur mobile/tactile | Moyen | Afficher toujours un indicateur + `opacity-70` en permanence |
+| U3 | `src/routes/index.tsx` | 15-20 | **Meta SEO pauvres** : description faible, pas d'Open Graph complet | Faible | Améliorer meta avec `og:image`, `og:url`, `twitter:card` |
+| U4 | `index.html` | - | **Meta vides** : titre "Personal Profile", pas de favicon, pas d'OG tags | Faible | Ajouter favicon, meta description, Open Graph |
+| U5 | `src/components/admin/ProfileForm.tsx` | 176 | **String matching fragile** : `msg.toLowerCase().includes("erreur")` pour la couleur | Faible | Utiliser un flag `isError` explicite |
+
+### Maintenabilité
+
+| # | Fichier | Lignes | Problème | Impact | Correction |
+|---|---------|--------|----------|--------|------------|
+| M1 | `src/services/supabaseService.ts` | 1-194 | Code mort complet | Élevé | Supprimer (les hooks font tout) |
+| M2 | `src/routes/$slug.tsx` | 388-498 | SVG icons dupliqués ×4 + SVG chevron ×2 | Moyen | Extraire en composants `ChevronLeft`, `ChevronRight`, `CloseIcon` |
+| M3 | `src/hooks/useProfile.ts` | 11, 131 | `isLoading` déprécié depuis TanStack Query v5 | Faible | Renommer en `isPending` |
+| M4 | `src/hooks/useGallery.ts` | 11, 95 | `isLoading` déprécié | Faible | Renommer en `isPending` |
+| M5 | `eslint.config.js` | 13 | `ecmaVersion: 2020` alors que `tsconfig` cible `ES2022` | Faible | Mettre à jour vers `2022` |
+| M6 | `tsconfig.json` | 19-20 | `noUnusedLocals: false` + `noUnusedParameters: false` | Faible | Passer à `true` (ESLint devrait compenser mais règle désactivée) |
+
+### Performance
+
+| # | Fichier | Lignes | Problème | Impact | Correction |
+|---|---------|--------|----------|--------|------------|
+| P1 | `src/components/admin/BackgroundControls.tsx` | 83-91 | 5 `setState` séparés dans 1 `useEffect` | Faible | Remplacer par 1 appel `setState(state => ({...state, ...next}))` |
+| P2 | `src/hooks/useAuth.ts` | 51-52 | `invalidateQueries(["profile"])` même si pas de profile chargé | Faible | Vérifier si queryKey existe avant invalidation |
+
+### Qualité Produit
+
+| # | Fichier | Lignes | Problème | Impact | Correction |
+|---|---------|--------|----------|--------|------------|
+| Q1 | `src/components/admin/BackgroundControls.tsx` | 25-54, 121-196 | **Styles inline** massifs au lieu de Tailwind — incohérent avec le reste de l'app (auth, landing, admin header) | Moyen | Migrer vers des classes Tailwind |
+| Q2 | `src/routes/admin.tsx` | 64 | **`setMsg` pattern** : force re-render des enfants, pas de toast moderne | Moyen | Remplacer par `sonner` toast (déjà en dépendances) |
+| Q3 | `src/routes/auth.tsx` | 46 | **`noValidate`** sans fallback JS de validation | Faible | Ajouter validation avec `zod` + `react-hook-form` |
+| Q4 | `src/lib/api/example.functions.ts` | 1-22 | Fichier example qui ressemble à du code prod | Faible | Supprimer ou déplacer dans un dossier `_examples/` |
+
+---
 
 ## 3. Plan d'action priorisé
 
 ### Quick wins (1-2 heures)
 
-**✅ Déjà faits, statut réel :**
-
-- ✅ **Extraire les types partagés vers `src/types/profile.ts`** — TERMINÉ
-- ✅ **Créer un hook d'authentification basique `useAuth.ts`** — TERMINÉ (mais à convertir en `useQuery` + `onAuthStateChange`, voir CT-D)
-- ✅ **Améliorer les messages d'erreur dans `auth.tsx`** — PARTIELLEMENT FAIT (`useAuth` OK, mais `admin.tsx` fuit encore `err.message`)
-
-**Quick wins réels restants :**
-
-- **QW-A** Réparer `supabaseService.ts` (ajouter `.eq("profile_id", profileId)` sur `deleteGalleryItem` et `deleteProfile`)
-- **QW-B** Supprimer `app.config.timestamp_*.js` ×5 + `fix_admin.py` à la racine
-- **QW-C** Fixer `navigate` pendant render dans `admin.tsx` (`useEffect` ou `redirect()` dans `beforeLoad`)
-- **QW-D** Brancher `$slug.tsx` sur le singleton `lib/supabase.ts`
-- **QW-E** Convertir `useAuth` en `useQuery(["auth","user"])` + `supabase.auth.onAuthStateChange`
+| # | Action | Fichier(s) | Effort |
+|---|--------|------------|--------|
+| QW-1 | ✅ **Créer `toUserMessage(err)`** pour masquer les erreurs PostgREST dans `admin.tsx` | `src/lib/error-message.ts` + `src/routes/admin.tsx` | 15 min |
+| QW-2 | ✅ **Renommer `isLoading` → `isPending`** dans `useProfile.ts` et `useGallery.ts` | `useProfile.ts`, `useGallery.ts`, `admin.tsx` | 5 min |
+| QW-3 | ✅ **Fixer `ecmaVersion: 2022`** dans `eslint.config.js` | `eslint.config.js` | 2 min |
+| QW-4 | ✅ **Supprimer `src/lib/api/example.functions.ts`** | `src/lib/api/example.functions.ts` | 2 min |
+| QW-5 | ✅ **Ajouter favicon** dans `index.html` | `index.html` + `public/favicon.svg` | 5 min |
+| QW-6 | ✅ **Extraire SVGs** en composants dans `$slug.tsx` | `$slug.tsx` | 15 min |
+| QW-7 | ✅ **Fusionner `goToPreviousSlide`/`goToNextSlide`/`goToPreviousModal`/`goToNextModal`** en fonctions réutilisables | `$slug.tsx` | 10 min |
 
 ### Important à court terme (1-2 jours)
 
-**✅ Déjà faits, statut réel :**
-
-- ✅ **Décomposer `admin.tsx`** — PARTIELLEMENT FAIT (fichiers créés, mais `BackgroundControls=359`, `ProfileForm=229`, `GalleryManager=202` lignes ; cap 200 non tenu)
-- ✅ **Hooks personnalisés via React Query** — PARTIELLEMENT FAIT (`useProfile`/`useGallery` OK, `useAuth` à refaire)
-
-**Important réel (1-2 j) :**
-
-- **CT-A** Découper `BackgroundControls.tsx` : extraire `parseBackground`, `buildValue`, `bgPreview` vers `lib/profile-utils.ts` ; scinder en sous-composants pour passer sous 200 lignes
-- **CT-B** Découper `ProfileForm.tsx` : extraire `AvatarPicker` ; labelliser chaque champ (`htmlFor`/`id`)
-- **CT-C** Découper `GalleryManager.tsx` : `GalleryUploader`, `GalleryItem`, `GalleryGrid` séparés ; `loading="lazy"` sur les images
-- **CT-D** Convertir `useAuth` en `useQuery(["auth","user"])` + subscription `onAuthStateChange`
+| # | Action | Fichier(s) | Effort |
+|---|--------|------------|--------|
+| CT-1 | ✅ **Refondre `$slug.tsx`** : extraire `GalleryCarousel`, `GalleryModal`, icônes | `$slug.tsx` → `components/public/` | 3-4 h |
+| CT-2 | ✅ **Remplacer `setMsg` par `sonner` toasts** dans `admin.tsx` et ses enfants | `admin.tsx`, `ProfileForm`, `GalleryManager`, `BackgroundControls` | 1-2 h |
+| CT-3 | ✅ **Supprimer `supabaseService.ts`** (code mort) | `src/services/supabaseService.ts` | 5 min |
+| CT-4 | ✅ **Fixer `Object.assign(profile, draft)`** dans `ProfileForm.tsx` | `ProfileForm.tsx:78` | 15 min |
+| CT-5 | ✅ **Ajouter focus trap** à la modale `$slug.tsx` | `$slug.tsx` | 1 h |
+| CT-6 | ✅ **Rendre bouton delete galerie visible** sur mobile | `GalleryManager.tsx` | 10 min |
+| CT-7 | ✅ **Ajouter `.env` à `.gitignore`** + creer `.env.example` | `.gitignore`, `.env.example` | 5 min |
 
 ### Refonte / amélioration structurelle (1-2 semaines)
 
-**✅ Déjà faits, statut réel :**
+| # | Action | Fichier(s) | Effort |
+|---|--------|------------|--------|
+| RS-1 | **Migrer styles inline `BackgroundControls`** vers Tailwind | `BackgroundControls.tsx` | 2 h |
+| RS-2 | **Ajouter validation formulaires** avec `zod` + `react-hook-form` | `auth.tsx`, `ProfileForm.tsx` | 2-3 h |
+| RS-3 | **Ajouter headers de sécurité** dans `vercel.json` | `vercel.json` | 30 min |
+| RS-4 | **Améliorer SEO/meta** : OG tags, meta description, Twitter card | `index.html`, `__root.tsx`, `index.tsx`, `$slug.tsx` | 1 h |
+| RS-5 | **Ajouter password reset** (route + flow Supabase) | `auth.tsx`, nouvelle route | 2 h |
+| RS-6 | **Consolider `buildBackgroundValue`/`buildBackgroundPreview`** | `profile-utils.ts:54-84` | 15 min |
+| RS-7 | **Réactiver `no-unused-vars`** dans ESLint + `noUnusedLocals`/`noUnusedParameters` dans tsconfig | `eslint.config.js`, `tsconfig.json` | 30 min |
+| RS-8 | **Réduire `setState` dans `BackgroundControls.useEffect`** | `BackgroundControls.tsx:83-91` | 10 min |
 
-- ✅ **Séparer data/presentation via `supabaseService.ts`** — FAUX (`supabaseService` est dormant, les hooks tapent `supabase` directement ; à réparer, pas supprimer — voir QW-A)
-- ✅ **Optimiser les perfs avec `memo`/`useMemo`** — PARTIELLEMENT FAIT (`useMemo`/`useCallback` présents, mais pas de `React.memo`, no-op `useMemo`, pas de lazy loading)
+---
 
-**Refonte réelle (1-2 sem) :**
+## 4. Top 10 changements les plus utiles
 
-- **RS-A** Migrer les styles inline des composants admin/auth vers Tailwind
-- **RS-B** Ajouter `React.memo` sur les 3 sous-composants admin + callbacks mémoïsés côté parent
-- **RS-C** Configurer `defaultOptions` sur `QueryClient` (`staleTime`, `retry`, `refetchOnWindowFocus`)
-- **RS-D** Audit accessibilité complet : labels associés, focus states, `role="alert"`, contraste, `aria-modal` focus trap sur la modale `$slug.tsx`
-- **RS-E** Audit sécurité Supabase : vérifier policies RLS sur `profile` et `gallery` ; préférer des Edge Functions pour les opérations sensibles
-- **RS-F** Ajouter un système de toasts (`Sonner`, déjà en deps) au lieu de `setMsg("...")`
-- **RS-G** Form validation avec `zod` + `react-hook-form` (déjà en deps, jamais utilisés)
-- **RS-H** Password reset / forgot password flow
+| # | Changement | Impact | Effort |
+|---|-----------|--------|--------|
+| 1 | ✅ **Créer `toUserMessage()` helper + brancher dans `admin.tsx`** (QW-1) | Sécurité — stop fuite infos PostgREST | 15 min |
+| 2 | ✅ **Extraire composants de `$slug.tsx`** (CT-1) | Maintenabilité — divise 526 lignes en modules | 3-4 h |
+| 3 | ✅ **Remplacer `setMsg` par `sonner` toasts** (CT-2) | UX — toasts modernes, moins de re-renders | 1-2 h |
+| 4 | ✅ **Supprimer `supabaseService.ts`** (CT-3) | Architecture — -194 lignes de code mort | 5 min |
+| 5 | ✅ **Fixer `Object.assign(profile, draft)`** (CT-4) | Correctness — stop mutation de props | 15 min |
+| 6 | ✅ **Ajouter focus trap modale** (CT-5) | A11y — navigation clavier complète | 1 h |
+| 7 | ✅ **Ajouter `.env` à `.gitignore`** (CT-7) | Sécurité — éviter fuite future de secrets | 5 min |
+| 8 | **Migrer styles inline `BackgroundControls` → Tailwind** (RS-1) | Consistance visuelle | 2 h |
+| 9 | ✅ **Extraire SVGs + fusionner fonctions navigation** (QW-6 + QW-7) | Maintenabilité — -40 lignes dupliquées | 25 min |
+| 10 | **Ajouter headers de sécurité** (RS-3) | Sécurité — CSP, XSS protection | 30 min |
 
-## 4. Top 10 changements les plus utiles (réordonné — sécurité en tête)
-
-1. ✅ Réparer `supabaseService.ts` (IDOR latent sur `deleteGalleryItem` / `deleteProfile`)
-2. ✅ Fixer `navigate-during-render` dans `admin.tsx`
-3. ✅ Implémenter le vrai upload background image dans `BackgroundControls`
-4. ✅ `useAuth` → `useQuery` + `onAuthStateChange`
-5. ✅ Découper `BackgroundControls.tsx` sous 200 lignes
-6. ✅ Brancher `$slug.tsx` sur le singleton Supabase
-7. ✅ Labels `htmlFor` + `role="alert"` dans `auth.tsx` (a11y critique)
-8. □ Migrer les styles inline des composants admin vers Tailwind
-9. 🟡 `useMemo`/`useCallback` utiles + `React.memo` sur les sous-composants admin — partiellement : `React.memo` posé sur les 4 sous-composants `background/`, `useCallback` déjà partout ; reste `React.memo` sur `ProfileForm`/`GalleryManager` et mémoïsation des callbacks côté parent `admin.tsx`
-10. ✅ Configurer `defaultOptions` QueryClient (`staleTime`, `retry`)
+---
 
 ## 5. Exemples concrets
 
-### Exemple 1 — IDOR latent dans `supabaseService.ts`
+### Exemple 1 — Fuite d'erreurs PostgREST (CRITICAL)
 
-**Fichier :** `src/services/supabaseService.ts:179-184`
+**Fichier :** `src/routes/admin.tsx:109, 119, 130, 140, 154`
 
 ```typescript
-// AVANT (vulnérable)
-async deleteGalleryItem(itemId: string): Promise<void> {
-  const { error } = await supabase
-    .from("gallery")
-    .delete()
-    .eq("id", itemId); // <-- pas de filtre profile_id
-  if (error) throw error;
+// AVANT — fuite d'information
+} catch (err) {
+  setMsg("Erreur : " + (err instanceof Error ? err.message : String(err)));
+}
+
+// APRÈS — message safe
+function toUserMessage(err: unknown): string {
+  const postgrestErrorMsg = err && typeof err === "object" && "code" in err
+    ? "Erreur lors de la sauvegarde. Veuillez réessayer."
+    : undefined;
+  return postgrestErrorMsg ?? "Une erreur est survenue.";
+}
+
+// Dans admin.tsx :
+} catch (err) {
+  console.error("Erreur admin:", err); // log détaillé côté dev
+  toast.error(toUserMessage(err));     // message safe pour l'utilisateur
 }
 ```
 
-**Version corrigée :**
+### Exemple 2 — Mutation de props dans ProfileForm
+
+**Fichier :** `src/components/admin/ProfileForm.tsx:78`
 
 ```typescript
-// APRÈS
-async deleteGalleryItem(profileId: string, itemId: string): Promise<void> {
-  const { error } = await supabase
-    .from("gallery")
-    .delete()
-    .eq("id", itemId)
-    .eq("profile_id", profileId); // <-- filtre tenant
-  if (error) throw error;
-}
+// AVANT — mutation directe de la prop `profile`
+const handleSave = useCallback(async () => {
+  setMsg("");
+  Object.assign(profile, draft);  // <-- mute l'objet reçu en props !
+  await onSave();
+}, [draft, onSave, profile, setMsg]);
+
+// APRÈS — pas de mutation, onSave reçoit les données
+const handleSave = useCallback(async () => {
+  setMsg("");
+  await onSave();  // onSave() lit profile via le hook parent
+}, [onSave, setMsg]);
 ```
 
-Aligné sur `useGallery.ts:80-84`.
+### Exemple 3 — SVG dupliqués dans $slug.tsx
 
-### Exemple 2 — `navigate()` pendant render
-
-**Fichier :** `src/routes/admin.tsx:61-63`
+**Fichier :** `src/routes/$slug.tsx:388-498`
 
 ```typescript
-// AVANT
-if (!userId) {
-  navigate({ to: "/auth" }); // warning runtime, side-effect dans render
-  return null;
-}
+// AVANT — 4 copies du même SVG chevron
+<svg fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="h-4 w-4">
+  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+</svg>
+// ... répété ×2 pour carrousel + ×2 pour modale
+
+// APRÈS — composants partagés
+const ChevronLeft = () => (
+  <svg fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="h-4 w-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+  </svg>
+);
+const ChevronRight = () => (
+  <svg fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="h-4 w-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+  </svg>
+);
 ```
 
-**Version corrigée :**
+### Exemple 4 — Fonctions de navigation dupliquées
+
+**Fichier :** `src/routes/$slug.tsx:180-194`
 
 ```typescript
-// APRÈS — via beforeLoad sur la route
-export const Route = createFileRoute("/admin")({
-  beforeLoad: ({ context }) => {
-    // ... check session via context.auth
-    if (!context.auth.userId) throw redirect({ to: "/auth" });
-  },
-  component: AdminPage,
-});
+// AVANT — 4 fonctions quasi-identiques
+const goToPreviousSlide = () => { setCurrentIndex((prev) => (prev - 1 + gallery.length) % gallery.length); };
+const goToNextSlide = () => { setCurrentIndex((prev) => (prev + 1) % gallery.length); };
+const goToPreviousModal = () => { setModalIndex((prev) => (prev - 1 + gallery.length) % gallery.length); };
+const goToNextModal = () => { setModalIndex((prev) => (prev + 1) % gallery.length); };
 
-// OU — via useEffect dans le composant
-useEffect(() => {
-  if (!checkingAuth && !userId) {
-    navigate({ to: "/auth" });
-  }
-}, [checkingAuth, userId, navigate]);
+// APRÈS — 2 fonctions génériques
+const navigateSlide = (dir: -1 | 1) =>
+  setCurrentIndex((prev) => (prev + dir + gallery.length) % gallery.length);
+const navigateModal = (dir: -1 | 1) =>
+  setModalIndex((prev) => (prev + dir + gallery.length) % gallery.length);
 ```
 
-### Exemple 3 — Upload background stub vs réel
+---
 
-**Fichier :** `src/components/admin/BackgroundControls.tsx:123-136`
+## 6. Référence
 
-```typescript
-// AVANT — stub FileReader, jamais uploadé
-const handleImagePick = useCallback((e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onloadend = () => {
-    setBgImageUrl(reader.result as string); // data:image/... en mémoire
-  };
-  reader.readAsDataURL(file);
-}, []);
-```
-
-**Version corrigée :**
-
-```typescript
-// APRÈS — vrai upload Supabase Storage
-const handleImagePick = useCallback(async (e) => {
-  const file = e.target.files?.[0];
-  if (!profile?.id || !file) return;
-  const path = `backgrounds/${profile.id}-${Date.now()}-${file.name}`;
-  const { error } = await supabase.storage
-    .from("profile")
-    .upload(path, file, { upsert: true });
-  if (error) {
-    setMsg("Erreur upload image : " + error.message);
-    return;
-  }
-  const { data } = supabase.storage.from("profile").getPublicUrl(path);
-  setBgImageUrl(data.publicUrl); // URL publique, pas data: URL
-}, [profile?.id, setMsg]);
-```
-
-### 🔧 Build errors fixed — journal
-
-```
-[2026-06-23] useAuth: suppression de checkExistingSession (redirige sans setUserId),
-              checkAuth peuple userId depuis supabase.auth.getUser().
-[2026-06-23] admin.tsx: suppression window.location.href au profit de navigate(),
-              distinction !userId (redirection) vs !profile (état vide explicite).
-[2026-06-23] auth.tsx: suppression import direct supabase, branchement sur useAuth.handleLogin.
-[2026-06-23] supabaseService.ts: ajout .eq("profile_id", profileId) sur deleteGalleryItem
-              et deleteProfile (anti-IDOR).
-[2026-06-23] useAuth: conversion en useQuery(["auth","user"]) + subscription
-              supabase.auth.onAuthStateChange pour invalidation auto.
-[2026-06-23] $slug.tsx: suppression du double createClient, branchement sur le singleton
-              src/lib/supabase.ts.
-[2026-06-23] admin.tsx: déplacement de navigate({ to: "/auth" }) dans useEffect
-              (évite le side-effect pendant render).
-[2026-06-23] racine: suppression des 5 fichiers app.config.timestamp_*.js et fix_admin.py
-              (artefacts).
-[2026-06-23 05:00] BackgroundControls: vrai upload d'image via useBackgroundUploader
-              (supabase.storage.from("profile").upload + getPublicUrl), suppression
-              du stub FileReader -> data:URL.
-[2026-06-23 05:00] lib/profile-utils.ts: extraction de parseBackground,
-              buildBackgroundValue, buildBackgroundPreview, BgType, BgDirection,
-              BG_TYPE_LABELS, BG_DIRECTION_LABELS.
-[2026-06-23 05:00] BackgroundControls: découpage en 4 sous-composants mémoïsés
-              (BackgroundTypePicker, BackgroundColorControls, BackgroundImagePicker,
-              BackgroundPreview) — 390 -> 199 lignes.
-[2026-06-23 05:00] router.tsx: defaultOptions QueryClient (staleTime 30s, retry 1,
-              refetchOnWindowFocus, mutations.retry 0).
-[2026-06-23 05:00] Nettoyage props fantômes : suppression userId/setMsg sur les
-              contrats ProfileForm, GalleryManager, BackgroundControls + call sites
-              admin.tsx.
-```
-
-## 7. Ordre recommandé si je n'ai que 2 heures, 1 journée, puis 1 semaine
-
-### 2 heures
-1. QW-A — Réparer `supabaseService.ts` (anti-IDOR)
-2. QW-B — Nettoyer la racine du repo
-3. QW-C — Fixer le `navigate`-pendant-render dans `admin.tsx`
-4. QW-D — Brancher `$slug.tsx` sur le singleton Supabase
-5. QW-E — Convertir `useAuth` en `useQuery` + `onAuthStateChange`
-
-### 1 journée
-1. CT-A — Découper `BackgroundControls.tsx` sous 200 lignes
-2. CT-B — Découper `ProfileForm.tsx` (extraire `AvatarPicker`, labels htmlFor)
-3. CT-C — Découper `GalleryManager.tsx` + `loading="lazy"`
-4. RS-D partiel — `role="alert"` + htmlFor dans `auth.tsx`
-
-### 1 semaine
-1. RS-A — Migrer les styles inline des composants admin/auth vers Tailwind
-2. RS-B — `React.memo` + callbacks mémoïsés
-3. RS-C — Configurer `defaultOptions` du QueryClient
-4. RS-D — Audit accessibilité complet
-5. RS-E — Audit sécurité Supabase (RLS, Edge Functions)
-6. RS-F — Système de toasts Sonner
-7. RS-G — Validation zod + react-hook-form
-8. RS-H — Password reset flow
-
-## Modiff en vrac
-### Récapitulatif
-src/routes/index.tsx réécrit pour matcher le design Gemini :
-Style visuel implémenté :
-- Fond radial bleu nuit (#1a2c4c → #0b111e) avec halo bleu bas-gauche 300px
-- Hero centré : kicker uppercase tracking-[0.2em], h1 4xl→6xl, sous-titre slate-300, paragraphe slate-400
-- 3 feature cards glassmorphism (bg-white/[0.03], border-white/10, backdrop-blur-md) avec hover translate-y + halo sky-300/30
-- Container icône : 2 icônes Lucide par carte (lucide-react, déjà en deps) en text-sky-300 sur fond bg-white/5
-- CTA : gradient from-sky-100 to-sky-200, texte slate-900, halo blur-[15px] derrière (.btn-glow) qui passe de 40% à 60% au hover
-- Lien « Déjà client ? Connectez-vous ici » avec underline + hover sky-400
-Modifs techniques :
-- Icônes Lucide importées depuis lucide-react (au lieu de <script src="lucide@latest"> côté navigateur)
-- Link TanStack Router pour les CTA → /auth
-- as const sur le tableau features pour le typage strict des icônes
-- aria-hidden sur les SVG et le halo décoratif (accessibilité)
-- 100 % Tailwind v4 natif, aucune dépendance ajoutée
-Vérif : tsc --noEmit clean, eslint 0 erreur.
-
-###Style visuel aligné :
-- Fond radial #1a2c4c → #0b111e + halo bleu bas-gauche (identique à /)
-- Carte glassmorphism : bg-white/[0.04], border-white/10, backdrop-blur-md, rounded-2xl, ombre 0_20px_60px
-- Badge NFC Card Admin en uppercase tracking-[0.2em] sky-300 (même rythme que le kicker de la landing)
-- H1 text-3xl sm:text-4xl font-bold tracking-tight (cohérent avec Cartes de visite NFC)
-- Inputs sur fond bg-slate-950/60 + border-white/10, focus ring sky-300/20 (couleur d'accent des cartes features)
-- CTA Se connecter : gradient sky-100 → sky-200 avec halo blur-[15px] derrière — exactement le même mécanisme que Commencer gratuitement sur la landing
-- Bouton WhatsApp : icône MessageCircle de lucide-react (au lieu de l'inline-SVG), pill arrondi, garde la couleur #25D366 (signal de marque)
-
-Récap du push 23/06 04:52
-- Commit : bbdd509 sur main
-- Titre : feat(ux+security+cleanup): redesign landing/auth/admin + fix login flow + cleanup
-- Message complet (4 sections : Design/UX, Sécurité/Auth, Architecture/Maintenabilité, Cleanup + Vérifications) en body
-- 22 fichiers modifiés : 2790 insertions, 2374 suppressions
-- Push : 5211b2c..bbdd509 main -> main sur github.com/seyleru95-creator/projet-nfc-card.git
-À demain.
+Ce plan suit les critères définis dans `AGENTS.md` :
+- **Architecture** : séparation des responsabilités, modularité, pas de duplication.
+- **Sécurité** : IDOR, fuite d'infos, headers, `.env` tracking.
+- **Maintenabilité** : taille des fichiers, nommage, TypeScript, code mort.
+- **UX** : accessibilité, feedback utilisateur, responsive, toasts.
+- **Performance** : renders inutiles, lazy loading, memoization.
+- **Qualité Produit** : incohérence visuelle, éléments non finis.

@@ -4,11 +4,9 @@ import { ProfileData } from "@/types/profile";
 
 interface ProfileFormProps {
   profile: ProfileData;
-  onSave: () => Promise<void>;
+  onSave: (draft: ProfileData) => Promise<void>;
   onUploadAvatar: (file: File) => Promise<void>;
   saving: boolean;
-  msg: string;
-  setMsg: (msg: string) => void;
 }
 
 type EditableField =
@@ -44,8 +42,6 @@ export function ProfileForm({
   onSave,
   onUploadAvatar,
   saving,
-  msg,
-  setMsg,
 }: ProfileFormProps) {
   const [draft, setDraft] = useState<ProfileData>(profile);
   const avatarRef = useRef<HTMLInputElement>(null);
@@ -74,10 +70,8 @@ export function ProfileForm({
   );
 
   const handleSave = useCallback(async () => {
-    setMsg("");
-    Object.assign(profile, draft);
-    await onSave();
-  }, [draft, onSave, profile, setMsg]);
+    await onSave(draft);
+  }, [draft, onSave]);
 
   const handleAvatarPick = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,14 +164,6 @@ export function ProfileForm({
             {saving ? "Sauvegarde..." : "Sauvegarder"}
           </button>
         </div>
-        {msg && (
-          <p
-            role="status"
-            className={`text-sm ${msg.toLowerCase().includes("erreur") ? "text-rose-300" : "text-emerald-300"}`}
-          >
-            {msg}
-          </p>
-        )}
       </div>
     </section>
   );

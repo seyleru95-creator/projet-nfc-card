@@ -8,7 +8,7 @@ export function useGallery(profileId: string) {
   // Query to fetch gallery items
   const {
     data: gallery = [],
-    isLoading,
+    isPending,
     isError,
     error,
   } = useQuery<GalleryItem[], Error>({
@@ -92,7 +92,7 @@ export function useGallery(profileId: string) {
 
   return {
     gallery,
-    isLoading,
+    isPending,
     isError,
     error,
     addGalleryItem: addGalleryItemMutation.mutateAsync,
