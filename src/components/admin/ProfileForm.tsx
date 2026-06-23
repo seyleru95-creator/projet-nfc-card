@@ -4,7 +4,6 @@ import { ProfileData } from "@/types/profile";
 
 interface ProfileFormProps {
   profile: ProfileData;
-  userId: string;
   onSave: () => Promise<void>;
   onUploadAvatar: (file: File) => Promise<void>;
   saving: boolean;
@@ -42,15 +41,12 @@ const inputClass =
 
 export function ProfileForm({
   profile,
-  userId,
   onSave,
   onUploadAvatar,
   saving,
   msg,
   setMsg,
 }: ProfileFormProps) {
-  void userId;
-
   const [draft, setDraft] = useState<ProfileData>(profile);
   const avatarRef = useRef<HTMLInputElement>(null);
 
@@ -71,10 +67,9 @@ export function ProfileForm({
   );
 
   const handleFieldChange = useCallback(
-    (field: EditableField) =>
-      (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setDraft((prev) => ({ ...prev, [field]: e.target.value }));
-      },
+    (field: EditableField) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setDraft((prev) => ({ ...prev, [field]: e.target.value }));
+    },
     [],
   );
 
@@ -131,7 +126,10 @@ export function ProfileForm({
             key={field}
             className={`flex flex-col gap-2 ${field === "bio" ? "sm:col-span-2" : ""}`}
           >
-            <label htmlFor={`field-${field}`} className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <label
+              htmlFor={`field-${field}`}
+              className="text-xs font-semibold uppercase tracking-wider text-slate-400"
+            >
               {FIELD_LABELS[field]}
             </label>
             {field === "bio" ? (

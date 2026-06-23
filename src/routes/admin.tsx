@@ -79,9 +79,7 @@ function AdminPage() {
   }
 
   if (!profile) {
-    return (
-      <LoadingShell title="Profil introuvable" subtitle="Aucun profil lie a ce compte." />
-    );
+    return <LoadingShell title="Profil introuvable" subtitle="Aucun profil lie a ce compte." />;
   }
 
   const isSaving =
@@ -201,7 +199,6 @@ function AdminPage() {
 
         <ProfileForm
           profile={profile}
-          userId={userId}
           onSave={saveProfile}
           onUploadAvatar={uploadAvatar}
           saving={isUpdatingProfile || isUpdatingAvatar}
@@ -211,7 +208,6 @@ function AdminPage() {
 
         <BackgroundControls
           profile={profile}
-          userId={userId}
           onSaveBackground={saveBackground}
           saving={isUpdatingBackground}
           msg={msg}
@@ -219,8 +215,6 @@ function AdminPage() {
         />
 
         <GalleryManager
-          profile={profile}
-          userId={userId}
           gallery={gallery}
           newCaption={newCaption}
           setNewCaption={setNewCaption}
@@ -228,7 +222,6 @@ function AdminPage() {
           onDeleteGalleryItem={handleDeleteGalleryItem}
           saving={isAddingGalleryItem || isDeletingGalleryItem}
           msg={msg}
-          setMsg={setMsg}
         />
 
         {isSaving && (

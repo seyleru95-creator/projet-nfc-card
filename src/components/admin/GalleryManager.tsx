@@ -1,10 +1,8 @@
 import { useCallback, useRef } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
-import { GalleryItem, ProfileData } from "@/types/profile";
+import { GalleryItem } from "@/types/profile";
 
 interface GalleryManagerProps {
-  profile: ProfileData;
-  userId: string;
   gallery: GalleryItem[];
   newCaption: string;
   setNewCaption: (caption: string) => void;
@@ -12,12 +10,9 @@ interface GalleryManagerProps {
   onDeleteGalleryItem: (itemId: string) => Promise<void>;
   saving: boolean;
   msg: string;
-  setMsg: (msg: string) => void;
 }
 
 export function GalleryManager({
-  profile,
-  userId,
   gallery,
   newCaption,
   setNewCaption,
@@ -25,12 +20,7 @@ export function GalleryManager({
   onDeleteGalleryItem,
   saving,
   msg,
-  setMsg,
 }: GalleryManagerProps) {
-  void userId;
-  void profile;
-  void setMsg;
-
   const galleryRef = useRef<HTMLInputElement>(null);
 
   const handleFilePick = useCallback(

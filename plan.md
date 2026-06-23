@@ -1,23 +1,27 @@
 # Plan d'amélioration du projet NFC Card
 
-_Dernière revue : 2026-06-23 — audit statique du dépôt, lecture seule._
+_Dernière revue : 2026-06-23 — passe 2 (Top 10 #3, #5, #10, CT-A, RS-C, props fantômes)._
 
 ## 1. Résumé global
 
 **Forces :**
-- TanStack Query v5 idiomatique dans `useProfile`/`useGallery` (`mutateAsync`, `invalidateQueries`, `setQueryData`, `enabled`).
+- TanStack Query v5 idiomatique dans `useProfile`/`useGallery`/`useAuth` (`mutateAsync`, `invalidateQueries`, `setQueryData`, `enabled`).
+- `useAuth` est désormais un `useQuery(["auth","user"])` branché sur `supabase.auth.onAuthStateChange` (invalidation auto des queries `profile` et `gallery`).
 - Types centralisés dans `src/types/profile.ts` et réutilisés partout.
-- `auth.tsx` ne tape plus `supabase` directement depuis la passe précédente — il passe par `useAuth.handleLogin`.
-- Décomposition `admin.tsx` → 3 sous-composants : fichiers créés, séparations franches.
+- `auth.tsx` ne tape plus `supabase` directement — il passe par `useAuth.handleLogin`.
+- Décomposition `admin.tsx` → 3 sous-composants, eux-mêmes éclatés : `BackgroundControls` (199) + 4 sous-composants mémoïsés dans `background/` (48–96), `ProfileForm` (184), `GalleryManager` (116).
+- `BackgroundControls` : vrai upload `supabase.storage.from("profile")` via `useBackgroundUploader` (plus de stub `FileReader`).
+- `router.tsx` : `defaultOptions` configurées (`staleTime: 30_000`, `retry: 1`, `refetchOnWindowFocus: true`).
+- Props fantômes nettoyés : `userId`/`setMsg` retirés des contrats `ProfileForm` / `GalleryManager` / `BackgroundControls`.
 - `$slug.tsx` n'a plus de fonction-form dans `head.meta`, plus de `buildVCard` local (passe à `lib/profile-utils.ts`).
 
 **Faiblesses :**
-- Les trois sous-composants admin dépassent le budget de 200 lignes (`BackgroundControls.tsx` à 359 lignes, soit presque le double du cap).
-- `useAuth` n'est pas un `useQuery` — incohérent avec le reste de la couche hooks, et ne s'abonne pas à `supabase.auth.onAuthStateChange`.
-- `$slug.tsx` recrée son propre client Supabase au lieu d'importer le singleton.
-- `BackgroundControls` upload d'image : stub `FileReader → data URL`, jamais pushé vers le bucket `profile`.
-- `services/supabaseService.ts` (184 lignes, mort) contient un `deleteGalleryItem` sans filtre `profile_id` — bombe à retardement si jamais câblé.
-- Migration Tailwind non faite : `BackgroundControls` (22 blocs `style={{}}`), `GalleryManager` (5), `ProfileForm` (4), `auth.tsx` (3) — toujours 100 % inline styles.
+- Migration Tailwind non terminée : `BackgroundControls` (20+ blocs `style={{}}`), `ProfileForm` (3), `GalleryManager` (3) — encore beaucoup d'inline styles, mais réduit.
+- `BackgroundControls` à 199 lignes (cap 200 respecté, mais fragile) ; le bloc "couleur unie" du mode `solid` reste en JSX inline et mériterait d'être extrait en `BackgroundSolidPicker` symétrique aux autres pickers.
+- `$slug.tsx` (526 lignes) reste monolithique : carrousel + modale + état tout dans un seul composant.
+- `admin.tsx` fuit toujours `err.message` PostgREST via `setMsg("Erreur X : " + err.message)` — helper `toUserMessage` pas créé.
+- `useProfile`/`useGallery` exposent encore `isLoading` (alias deprecated de `isPending`).
+- `services/supabaseService.ts` reste dormant (194 lignes) — non câblé, mais IDOR corrigé.
 - `plan.md` coche des ✅ qui ne correspondent pas à la réalité du code.
 
 **Risques :**
@@ -105,16 +109,16 @@ _Dernière revue : 2026-06-23 — audit statique du dépôt, lecture seule._
 
 ## 4. Top 10 changements les plus utiles (réordonné — sécurité en tête)
 
-1. □ Réparer `supabaseService.ts` (IDOR latent sur `deleteGalleryItem` / `deleteProfile`)
-2. □ Fixer `navigate-during-render` dans `admin.tsx`
-3. □ Implémenter le vrai upload background image dans `BackgroundControls`
-4. □ `useAuth` → `useQuery` + `onAuthStateChange`
-5. □ Découper `BackgroundControls.tsx` sous 200 lignes
-6. □ Brancher `$slug.tsx` sur le singleton Supabase
-7. □ Labels `htmlFor` + `role="alert"` dans `auth.tsx` (a11y critique)
+1. ✅ Réparer `supabaseService.ts` (IDOR latent sur `deleteGalleryItem` / `deleteProfile`)
+2. ✅ Fixer `navigate-during-render` dans `admin.tsx`
+3. ✅ Implémenter le vrai upload background image dans `BackgroundControls`
+4. ✅ `useAuth` → `useQuery` + `onAuthStateChange`
+5. ✅ Découper `BackgroundControls.tsx` sous 200 lignes
+6. ✅ Brancher `$slug.tsx` sur le singleton Supabase
+7. ✅ Labels `htmlFor` + `role="alert"` dans `auth.tsx` (a11y critique)
 8. □ Migrer les styles inline des composants admin vers Tailwind
-9. □ `useMemo`/`useCallback` utiles + `React.memo` sur les sous-composants admin
-10. □ Configurer `defaultOptions` QueryClient (`staleTime`, `retry`)
+9. 🟡 `useMemo`/`useCallback` utiles + `React.memo` sur les sous-composants admin — partiellement : `React.memo` posé sur les 4 sous-composants `background/`, `useCallback` déjà partout ; reste `React.memo` sur `ProfileForm`/`GalleryManager` et mémoïsation des callbacks côté parent `admin.tsx`
+10. ✅ Configurer `defaultOptions` QueryClient (`staleTime`, `retry`)
 
 ## 5. Exemples concrets
 
@@ -236,6 +240,20 @@ const handleImagePick = useCallback(async (e) => {
               (évite le side-effect pendant render).
 [2026-06-23] racine: suppression des 5 fichiers app.config.timestamp_*.js et fix_admin.py
               (artefacts).
+[2026-06-23 05:00] BackgroundControls: vrai upload d'image via useBackgroundUploader
+              (supabase.storage.from("profile").upload + getPublicUrl), suppression
+              du stub FileReader -> data:URL.
+[2026-06-23 05:00] lib/profile-utils.ts: extraction de parseBackground,
+              buildBackgroundValue, buildBackgroundPreview, BgType, BgDirection,
+              BG_TYPE_LABELS, BG_DIRECTION_LABELS.
+[2026-06-23 05:00] BackgroundControls: découpage en 4 sous-composants mémoïsés
+              (BackgroundTypePicker, BackgroundColorControls, BackgroundImagePicker,
+              BackgroundPreview) — 390 -> 199 lignes.
+[2026-06-23 05:00] router.tsx: defaultOptions QueryClient (staleTime 30s, retry 1,
+              refetchOnWindowFocus, mutations.retry 0).
+[2026-06-23 05:00] Nettoyage props fantômes : suppression userId/setMsg sur les
+              contrats ProfileForm, GalleryManager, BackgroundControls + call sites
+              admin.tsx.
 ```
 
 ## 7. Ordre recommandé si je n'ai que 2 heures, 1 journée, puis 1 semaine
@@ -289,3 +307,11 @@ Vérif : tsc --noEmit clean, eslint 0 erreur.
 - Inputs sur fond bg-slate-950/60 + border-white/10, focus ring sky-300/20 (couleur d'accent des cartes features)
 - CTA Se connecter : gradient sky-100 → sky-200 avec halo blur-[15px] derrière — exactement le même mécanisme que Commencer gratuitement sur la landing
 - Bouton WhatsApp : icône MessageCircle de lucide-react (au lieu de l'inline-SVG), pill arrondi, garde la couleur #25D366 (signal de marque)
+
+Récap du push 23/06 04:52
+- Commit : bbdd509 sur main
+- Titre : feat(ux+security+cleanup): redesign landing/auth/admin + fix login flow + cleanup
+- Message complet (4 sections : Design/UX, Sécurité/Auth, Architecture/Maintenabilité, Cleanup + Vérifications) en body
+- 22 fichiers modifiés : 2790 insertions, 2374 suppressions
+- Push : 5211b2c..bbdd509 main -> main sur github.com/seyleru95-creator/projet-nfc-card.git
+À demain.
