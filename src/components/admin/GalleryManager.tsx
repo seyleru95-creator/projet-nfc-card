@@ -100,7 +100,6 @@ export function GalleryManager({
           <p className="col-span-full py-6 text-center text-sm text-slate-500">Aucune photo</p>
         )}
       </div>
-
     </section>
   );
 }

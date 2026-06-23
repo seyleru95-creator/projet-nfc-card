@@ -25,8 +25,8 @@ export function GalleryModal({
     if (!dialogRef.current) return [];
     return Array.from(
       dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      )
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
     );
   }, []);
 
@@ -101,10 +101,7 @@ export function GalleryModal({
       aria-modal="true"
       aria-label="Galerie photo"
     >
-      <div
-        className="relative max-h-[90vh] max-w-[90vw]"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="relative max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
         <button
           ref={closeRef}
           onClick={onClose}
@@ -144,9 +141,7 @@ export function GalleryModal({
         />
 
         {gallery[modalIndex].caption && (
-          <p className="mt-2 text-center text-sm text-white/80">
-            {gallery[modalIndex].caption}
-          </p>
+          <p className="mt-2 text-center text-sm text-white/80">{gallery[modalIndex].caption}</p>
         )}
       </div>
     </div>

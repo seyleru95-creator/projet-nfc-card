@@ -37,12 +37,7 @@ const FIELD_LABELS: Record<EditableField, string> = {
 const inputClass =
   "w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition-all focus:border-sky-300/50 focus:ring-2 focus:ring-sky-300/20";
 
-export function ProfileForm({
-  profile,
-  onSave,
-  onUploadAvatar,
-  saving,
-}: ProfileFormProps) {
+export function ProfileForm({ profile, onSave, onUploadAvatar, saving }: ProfileFormProps) {
   const [draft, setDraft] = useState<ProfileData>(profile);
   const avatarRef = useRef<HTMLInputElement>(null);
 

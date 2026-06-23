@@ -63,11 +63,7 @@ function applyInitial(initial: ParsedBackground) {
   };
 }
 
-export function BackgroundControls({
-  profile,
-  onSaveBackground,
-  saving,
-}: BackgroundControlsProps) {
+export function BackgroundControls({ profile, onSaveBackground, saving }: BackgroundControlsProps) {
   const initial = useMemo(() => parseBackground(profile), [profile]);
 
   const [bgType, setBgType] = useState<BgType>(initial.type);

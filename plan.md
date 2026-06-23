@@ -132,22 +132,15 @@ _Dernière revue : 2026-06-23 — passe 3 (revue exhaustive)._
 | RS-7 | **Réactiver `no-unused-vars`** dans ESLint + `noUnusedLocals`/`noUnusedParameters` dans tsconfig | `eslint.config.js`, `tsconfig.json` | 30 min |
 | RS-8 | **Réduire `setState` dans `BackgroundControls.useEffect`** | `BackgroundControls.tsx:83-91` | 10 min |
 
+### Demande client 
+| CL1 | **probleme couleurs lorsqu'on change de page, couleur rose**
 ---
 
 ## 4. Top 10 changements les plus utiles
 
 | # | Changement | Impact | Effort |
 |---|-----------|--------|--------|
-| 1 | ✅ **Créer `toUserMessage()` helper + brancher dans `admin.tsx`** (QW-1) | Sécurité — stop fuite infos PostgREST | 15 min |
-| 2 | ✅ **Extraire composants de `$slug.tsx`** (CT-1) | Maintenabilité — divise 526 lignes en modules | 3-4 h |
-| 3 | ✅ **Remplacer `setMsg` par `sonner` toasts** (CT-2) | UX — toasts modernes, moins de re-renders | 1-2 h |
-| 4 | ✅ **Supprimer `supabaseService.ts`** (CT-3) | Architecture — -194 lignes de code mort | 5 min |
-| 5 | ✅ **Fixer `Object.assign(profile, draft)`** (CT-4) | Correctness — stop mutation de props | 15 min |
-| 6 | ✅ **Ajouter focus trap modale** (CT-5) | A11y — navigation clavier complète | 1 h |
-| 7 | ✅ **Ajouter `.env` à `.gitignore`** (CT-7) | Sécurité — éviter fuite future de secrets | 5 min |
-| 8 | **Migrer styles inline `BackgroundControls` → Tailwind** (RS-1) | Consistance visuelle | 2 h |
-| 9 | ✅ **Extraire SVGs + fusionner fonctions navigation** (QW-6 + QW-7) | Maintenabilité — -40 lignes dupliquées | 25 min |
-| 10 | **Ajouter headers de sécurité** (RS-3) | Sécurité — CSP, XSS protection | 30 min |
+| 1 | **Ajouter headers de sécurité** (RS-3) | Sécurité — CSP, XSS protection | 30 min |
 
 ---
 

@@ -48,11 +48,7 @@ function SlugProfilePage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  useEffect(() => {
-    loadProfileBySlug();
-  }, [slug]);
-
-  async function loadProfileBySlug() {
+  const loadProfileBySlug = useCallback(async () => {
     setLoading(true);
     setNotFound(false);
     setProfile(null);
@@ -90,7 +86,11 @@ function SlugProfilePage() {
     }
 
     setLoading(false);
-  }
+  }, [slug]);
+
+  useEffect(() => {
+    loadProfileBySlug();
+  }, [loadProfileBySlug]);
 
   useEffect(() => {
     if (gallery.length <= 1 || modalOpen) return;
@@ -123,14 +123,14 @@ function SlugProfilePage() {
     (direction: -1 | 1) => {
       setCurrentIndex((prev) => (prev + direction + gallery.length) % gallery.length);
     },
-    [gallery.length]
+    [gallery.length],
   );
 
   const navigateModal = useCallback(
     (direction: -1 | 1) => {
       setModalIndex((prev) => (prev + direction + gallery.length) % gallery.length);
     },
-    [gallery.length]
+    [gallery.length],
   );
 
   if (loading) {
