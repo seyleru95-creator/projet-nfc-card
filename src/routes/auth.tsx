@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { MessageCircle } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -28,6 +28,13 @@ function AuthPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-x-hidden bg-[radial-gradient(circle_at_80%_20%,#1a2c4c_0%,#0b111e_60%)] px-5 py-10 text-white sm:px-6 sm:py-16">
+      <Link
+        to="/"
+        className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-sky-300/30 hover:bg-white/[0.08] hover:text-sky-300 sm:left-6 sm:top-6"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden />
+        Accueil
+      </Link>
       <div
         aria-hidden
         className="pointer-events-none absolute bottom-[10%] left-[5%] h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.15)_0%,rgba(0,0,0,0)_70%)]"
@@ -98,7 +105,7 @@ function AuthPage() {
         </form>
 
         <div className="mt-8 text-center">
-          <p className="mb-3 text-sm text-slate-400">Nouveau client ? ecrivez-nous</p>
+          <p className="mb-3 text-sm text-slate-400">Nouveau client ? Ecrivez-nous</p>
           <a
             href="https://wa.me/41799384082"
             target="_blank"
@@ -109,6 +116,7 @@ function AuthPage() {
             Contactez-nous
           </a>
         </div>
+
       </div>
     </div>
   );

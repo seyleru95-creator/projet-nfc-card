@@ -132,11 +132,9 @@ _Dernière revue : 2026-06-23 — passe 3 (revue exhaustive)._
 | RS-7 | **Réactiver `no-unused-vars`** dans ESLint + `noUnusedLocals`/`noUnusedParameters` dans tsconfig | `eslint.config.js`, `tsconfig.json` | 30 min |
 | RS-8 | **Réduire `setState` dans `BackgroundControls.useEffect`** | `BackgroundControls.tsx:83-91` | 10 min |
 
-### Demande client 
-| CL1 | **probleme couleurs lorsqu'on change de page, couleur rose**
 ---
 
-## 4. Top 10 changements les plus utiles
+## 4. Top changements les plus utiles
 
 | # | Changement | Impact | Effort |
 |---|-----------|--------|--------|
@@ -243,3 +241,19 @@ Ce plan suit les critères définis dans `AGENTS.md` :
 - **UX** : accessibilité, feedback utilisateur, responsive, toasts.
 - **Performance** : renders inutiles, lazy loading, memoization.
 - **Qualité Produit** : incohérence visuelle, éléments non finis.
+
+## 7. Récap
+### Session 23 juin 2026
+
+Correction de 6 bugs UI/UX critiques identifiés lors de la session de review.
+
+| Bug | Cause | Correction |
+|-----|-------|------------|
+| Flash violet/rose au chargement | Variables `:root` en mode clair + pas de script dark mode | Script inline `<head>` + variables `:root` = dark mode |
+| Effet loupe au scroll (admin) | `backdrop-filter: blur()` sur éléments scrollables | `backdrop-blur-md` supprimé de tous les wrappers admin |
+| Carré noir sur images | Pas de `onError` sur les `<img>` | `onError` + fallback icône/texte sur toutes les images |
+| Images ne s'affichent pas | `loading="lazy"` + `hidden` = navigateur ne charge jamais | `opacity-0` au lieu de `hidden` (élément reste dans le layout) |
+| Chargement lent galerie | Requêtes profil → galerie séquentielles | Profil affiché immédiatement + galerie en arrière-plan |
+| Erreur build ProfileForm | Texte markdown en tête de fichier | Texte supprimé + warning React Hook corrigé |
+
+**9 fichiers modifiés** — Build OK, ESLint 0 erreurs.

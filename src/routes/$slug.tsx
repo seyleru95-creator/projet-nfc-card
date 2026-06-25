@@ -111,14 +111,22 @@ function SlugProfilePage() {
     const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
     const url = window.URL.createObjectURL(blob);
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${(profile?.name || "contact").replace(/\s+/g, "-").toLowerCase()}.vcf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    window.URL.revokeObjectURL(url);
+    // On mobile, opening the blob URL directly triggers the native contacts app
+    // without a download dialog. On desktop it falls back to a download.
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = url;
+      // Revoke after a short delay to let the OS grab the blob
+      setTimeout(() => window.URL.revokeObjectURL(url), 3000);
+    } else {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(profile?.name || "contact").replace(/\s+/g, "-").toLowerCase()}.vcf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }
   };
 
   const navigateSlide = useCallback(
@@ -230,10 +238,10 @@ function SlugProfilePage() {
         />
       )}
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:py-16">
-        <main className="glass-panel animate-in fade-in slide-in-from-bottom-4 w-full max-w-sm rounded-[2rem] p-6 text-card-foreground duration-700 sm:p-8">
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-3 py-6 sm:px-4 sm:py-16">
+        <main className="glass-panel animate-in fade-in slide-in-from-bottom-4 w-full max-w-sm rounded-[2rem] p-4 text-card-foreground duration-700 sm:p-8">
           <div className="flex flex-col items-center text-center">
-            <div className="photo-ring h-40 w-40 overflow-hidden rounded-full sm:h-48 sm:w-48">
+            <div className="photo-ring h-28 w-28 overflow-hidden rounded-full sm:h-48 sm:w-48">
               <img
                 src={
                   profile.photo_url ||
@@ -245,19 +253,19 @@ function SlugProfilePage() {
               />
             </div>
 
-            <h1 className="mt-5 text-2xl font-semibold tracking-tight text-card-foreground sm:text-3xl">
+            <h1 className="mt-4 text-xl font-semibold tracking-tight text-card-foreground sm:mt-5 sm:text-3xl">
               {profile.name}
             </h1>
-            <p className="mt-1 text-sm font-medium text-muted-foreground sm:text-base">
+            <p className="mt-1 text-xs font-medium text-muted-foreground sm:text-base">
               {profile.subtitle}
             </p>
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-card-foreground/90 sm:max-w-sm sm:text-[15px]">
+            <p className="mt-2 max-w-xs text-xs leading-relaxed text-card-foreground/90 sm:mt-3 sm:max-w-sm sm:text-[15px]">
               {profile.bio}
             </p>
           </div>
 
           {activeLinks.length > 0 && (
-            <div className="mt-6 flex w-full flex-col gap-3">
+            <div className="mt-4 flex w-full flex-col gap-2 sm:mt-6 sm:gap-3">
               {activeLinks.map(({ key, label, icon }) => {
                 const rawValue = profile[key] as string;
                 const href = formatLink(key, rawValue);
@@ -268,7 +276,7 @@ function SlugProfilePage() {
                     href={href}
                     target={key === "email" || key === "phone" ? undefined : "_blank"}
                     rel={key === "email" || key === "phone" ? undefined : "noopener noreferrer"}
-                    className="group flex items-center justify-between rounded-2xl border border-border/70 bg-card/65 px-4 py-3.5 text-sm font-medium text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card/85 hover:shadow-md active:scale-[0.98] sm:py-4"
+                    className="group flex items-center justify-between rounded-2xl border border-border/70 bg-card/65 px-3 py-3 text-sm font-medium text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card/85 hover:shadow-md active:scale-[0.98] sm:px-4 sm:py-4"
                     aria-label={`${label} : ${rawValue}`}
                   >
                     <span className="flex items-center gap-3">
@@ -293,11 +301,11 @@ function SlugProfilePage() {
             </div>
           )}
 
-          <div className="mt-4">
+          <div className="mt-3 sm:mt-4">
             <button
               type="button"
               onClick={downloadVCard}
-              className="w-full rounded-2xl border border-border/70 bg-card/85 px-4 py-3.5 text-sm font-semibold text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card hover:shadow-md active:scale-[0.98]"
+              className="w-full rounded-2xl border border-border/70 bg-card/85 px-4 py-3 text-sm font-semibold text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card hover:shadow-md active:scale-[0.98] sm:py-3.5"
             >
               Enregistrer le contact
             </button>
