@@ -154,8 +154,8 @@ export const buildVCard = (profile: ProfileData | null): string => {
   const instagramUrl = profile.instagram ? formatLink("instagram", profile.instagram) : "";
   const tiktokUrl = profile.tiktok ? formatLink("tiktok", profile.tiktok) : "";
   const whatsappUrl = profile.whatsapp ? formatLink("whatsapp", profile.whatsapp) : "";
-  const emailUrl = profile.email ? formatLink("email", profile.email) : "";
-  const phoneUrl = profile.phone ? formatLink("phone", profile.phone) : "";
+  const emailUrl = profile.email || "";
+  const phoneUrl = profile.phone || "";
 
   return [
     "BEGIN:VCARD",
