@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import QRCode from "react-qr-code";
 import { supabase } from "@/lib/supabase";
 import { ProfileData, GalleryItem } from "@/types/profile";
-import { formatLink, buildVCard, buildContactIntentUrl } from "@/lib/profile-utils";
+import { formatLink, buildVCard } from "@/lib/profile-utils";
 import { InstagramIcon, TikTokIcon } from "@/components/public/icons";
 import { GalleryCarousel } from "@/components/public/GalleryCarousel";
 import { GalleryModal } from "@/components/public/GalleryModal";
@@ -110,17 +110,12 @@ function SlugProfilePage() {
 
   const saveContact = () => {
     if (!profile) return;
-    const ua = navigator.userAgent;
-    const isAndroid = /Android/i.test(ua);
-    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-    if (isAndroid) {
-      // Ouvre l'app Contacts pré-remplie (nom/tél/email), sans téléchargement
-      window.location.href = buildContactIntentUrl(profile);
-      return;
-    }
-
-    // iPhone : fiche contact native (tous les champs). Desktop : téléchargement .vcf.
+    // iPhone : pas d'attribut download → Safari ouvre la fiche contact native.
+    // Android : l'OS bloque l'ouverture directe de Contacts depuis le web
+    // (activité INSERT non "browsable"), donc on télécharge le .vcf complet →
+    // un tap sur la notification ouvre l'import Contacts. Desktop : téléchargement.
     const blob = new Blob([vcardData], { type: "text/vcard;charset=utf-8" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");

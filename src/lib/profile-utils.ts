@@ -135,22 +135,6 @@ export const formatLink = (key: keyof ProfileData, value: string): string => {
 };
 
 /**
- * Build an Android intent:// URL that opens the Contacts app pre-filled.
- * Works on Chromium-based Android browsers (Chrome, Opera, Samsung, Edge).
- * Limité à nom/téléphone/email — pas de téléchargement.
- * @param profile - The profile data
- * @returns intent:// URL string (empty if no profile)
- */
-export const buildContactIntentUrl = (profile: ProfileData | null): string => {
-  if (!profile) return "";
-  const extras: string[] = [];
-  if (profile.name) extras.push(`S.name=${encodeURIComponent(profile.name)}`);
-  if (profile.phone) extras.push(`S.phone=${encodeURIComponent(profile.phone)}`);
-  if (profile.email) extras.push(`S.email=${encodeURIComponent(profile.email)}`);
-  return `intent://contacts#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/contact;${extras.join(";")};end`;
-};
-
-/**
  * Build a vCard string from profile data
  * @param profile - The profile data to convert to vCard format
  * @returns vCard formatted string
