@@ -110,23 +110,20 @@ function SlugProfilePage() {
 
     const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
     const url = window.URL.createObjectURL(blob);
-
-    // On mobile, opening the blob URL directly triggers the native contacts app
-    // without a download dialog. On desktop it falls back to a download.
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) {
-      window.location.href = url;
-      // Revoke after a short delay to let the OS grab the blob
-      setTimeout(() => window.URL.revokeObjectURL(url), 3000);
-    } else {
-      const a = document.createElement("a");
-      a.href = url;
+
+    const a = document.createElement("a");
+    a.href = url;
+    // Sur mobile : pas d'attribut download → l'OS route le MIME type text/vcard
+    // vers l'app Contacts native directement, sans étape de téléchargement.
+    // Sur desktop : attribut download → télécharge le .vcf.
+    if (!isMobile) {
       a.download = `${(profile?.name || "contact").replace(/\s+/g, "-").toLowerCase()}.vcf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
     }
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => window.URL.revokeObjectURL(url), 100);
   };
 
   const navigateSlide = useCallback(
