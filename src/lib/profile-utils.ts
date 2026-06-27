@@ -161,7 +161,7 @@ export const buildVCard = (profile: ProfileData | null): string => {
     "BEGIN:VCARD",
     "VERSION:3.0",
     `FN:${cleanText(profile.name)}`,
-    profile.subtitle ? `NOTE:${cleanText(profile.subtitle)}` : "",
+    profile.subtitle ? `TITLE:${cleanText(profile.subtitle)}` : "",
     profile.bio ? `NOTE:${cleanText(profile.bio)}` : "",
     profile.photo_url ? `PHOTO:${profile.photo_url}` : "",
     websiteUrl ? `URL:${websiteUrl}` : "",

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Globe, Linkedin, Mail, MessageCircle, Phone } from "lucide-react";
+import { Globe, Linkedin, Mail, MessageCircle, Phone, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import QRCode from "react-qr-code";
 import { supabase } from "@/lib/supabase";
 import { ProfileData, GalleryItem } from "@/types/profile";
 import { formatLink, buildVCard } from "@/lib/profile-utils";
@@ -44,6 +45,7 @@ function SlugProfilePage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalIndex, setModalIndex] = useState(0);
+  const [qrOpen, setQrOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [galleryLoading, setGalleryLoading] = useState(false);
@@ -104,37 +106,7 @@ function SlugProfilePage() {
     return () => clearInterval(timer);
   }, [gallery, modalOpen]);
 
-  const downloadVCard = async () => {
-    const vcard = buildVCard(profile);
-    if (!vcard) return;
-
-    const filename = `${(profile?.name || "contact").replace(/\s+/g, "-").toLowerCase()}.vcf`;
-    const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
-
-    // Web Share API : iOS et Android ouvrent directement l'app Contacts
-    // avec des boutons Enregistrer / Annuler clairs, sans étape de téléchargement.
-    if (navigator.share) {
-      const file = new File([blob], filename, { type: "text/vcard" });
-      if (navigator.canShare?.({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file] });
-          return;
-        } catch {
-          // annulation par l'utilisateur ou erreur → fallback téléchargement
-        }
-      }
-    }
-
-    // Fallback desktop : téléchargement classique du .vcf
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => window.URL.revokeObjectURL(url), 100);
-  };
+  const vcardData = buildVCard(profile);
 
   const navigateSlide = useCallback(
     (direction: -1 | 1) => {
@@ -308,15 +280,57 @@ function SlugProfilePage() {
             </div>
           )}
 
-          <div className="mt-3 sm:mt-4">
-            <button
-              type="button"
-              onClick={downloadVCard}
-              className="w-full rounded-2xl border border-border/70 bg-card/85 px-4 py-3 text-sm font-semibold text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card hover:shadow-md active:scale-[0.98] sm:py-3.5"
+          {vcardData && (
+            <div className="mt-3 sm:mt-4">
+              <button
+                type="button"
+                onClick={() => setQrOpen(true)}
+                className="w-full rounded-2xl border border-border/70 bg-card/85 px-4 py-3 text-sm font-semibold text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card hover:shadow-md active:scale-[0.98] sm:py-3.5"
+              >
+                Enregistrer le contact
+              </button>
+            </div>
+          )}
+
+          {/* QR Code modal */}
+          {qrOpen && vcardData && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm"
+              onClick={() => setQrOpen(false)}
             >
-              Enregistrer le contact
-            </button>
-          </div>
+              <div
+                className="relative w-full max-w-xs rounded-3xl bg-white p-6 text-center shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => setQrOpen(false)}
+                  className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Fermer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+                <p className="mb-1 text-base font-semibold text-slate-800">
+                  Scanner pour ajouter
+                </p>
+                <p className="mb-5 text-xs text-slate-500">
+                  Pointez l'appareil photo sur le QR code
+                </p>
+                <div className="flex justify-center">
+                  <QRCode
+                    value={vcardData}
+                    size={200}
+                    level="M"
+                    bgColor="#ffffff"
+                    fgColor="#0f172a"
+                  />
+                </div>
+                <p className="mt-4 text-[11px] text-slate-400">
+                  Compatible iPhone et Android
+                </p>
+              </div>
+            </div>
+          )}
 
           {(gallery.length > 0 || galleryLoading) && (
             <div className="mt-8">
