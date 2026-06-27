@@ -149,6 +149,11 @@ export const buildVCard = (profile: ProfileData | null): string => {
       .replace(/,/g, "\\,")
       .replace(/;/g, "\\;");
 
+  // Sépare "Prénom Nom" → firstName="Prénom", lastName="Nom"
+  const parts = (profile.name || "").trim().split(/\s+/);
+  const firstName = cleanText(parts.slice(0, -1).join(" ") || parts[0]);
+  const lastName = cleanText(parts.length > 1 ? parts[parts.length - 1] : "");
+
   const websiteUrl = profile.website ? formatLink("website", profile.website) : "";
   const linkedinUrl = profile.linkedin ? formatLink("linkedin", profile.linkedin) : "";
   const instagramUrl = profile.instagram ? formatLink("instagram", profile.instagram) : "";
@@ -161,6 +166,7 @@ export const buildVCard = (profile: ProfileData | null): string => {
     "BEGIN:VCARD",
     "VERSION:3.0",
     `FN:${cleanText(profile.name)}`,
+    `N:${lastName};${firstName};;;`,
     profile.subtitle ? `TITLE:${cleanText(profile.subtitle)}` : "",
     profile.bio ? `NOTE:${cleanText(profile.bio)}` : "",
     profile.photo_url ? `PHOTO:${profile.photo_url}` : "",
