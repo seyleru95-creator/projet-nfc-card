@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import QRCode from "react-qr-code";
 import { supabase } from "@/lib/supabase";
 import { ProfileData, GalleryItem } from "@/types/profile";
-import { formatLink, buildVCard } from "@/lib/profile-utils";
+import { formatLink, buildVCard, buildContactIntentUrl } from "@/lib/profile-utils";
 import { InstagramIcon, TikTokIcon } from "@/components/public/icons";
 import { GalleryCarousel } from "@/components/public/GalleryCarousel";
 import { GalleryModal } from "@/components/public/GalleryModal";
@@ -107,6 +107,32 @@ function SlugProfilePage() {
   }, [gallery, modalOpen]);
 
   const vcardData = buildVCard(profile);
+
+  const saveContact = () => {
+    if (!profile) return;
+    const ua = navigator.userAgent;
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+
+    if (isAndroid) {
+      // Ouvre l'app Contacts pré-remplie (nom/tél/email), sans téléchargement
+      window.location.href = buildContactIntentUrl(profile);
+      return;
+    }
+
+    // iPhone : fiche contact native (tous les champs). Desktop : téléchargement .vcf.
+    const blob = new Blob([vcardData], { type: "text/vcard;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    if (!isIOS) {
+      a.download = `${(profile.name || "contact").replace(/\s+/g, "-").toLowerCase()}.vcf`;
+    }
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  };
 
   const navigateSlide = useCallback(
     (direction: -1 | 1) => {
@@ -284,7 +310,7 @@ function SlugProfilePage() {
             <div className="mt-3 sm:mt-4">
               <button
                 type="button"
-                onClick={() => setQrOpen(true)}
+                onClick={saveContact}
                 className="w-full rounded-2xl border border-border/70 bg-card/85 px-4 py-3 text-sm font-semibold text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-card hover:shadow-md active:scale-[0.98] sm:py-3.5"
               >
                 Enregistrer le contact
@@ -364,6 +390,15 @@ function SlugProfilePage() {
           )}
 
           <footer className="mt-8 pb-2 text-center">
+            {vcardData && (
+              <button
+                type="button"
+                onClick={() => setQrOpen(true)}
+                className="mb-2 block w-full text-[11px] text-muted-foreground/70 underline underline-offset-2 transition-colors hover:text-muted-foreground"
+              >
+                Partager via QR code
+              </button>
+            )}
             <p className="text-[11px] text-muted-foreground">{profile.name} — Personal Profile</p>
           </footer>
         </main>
