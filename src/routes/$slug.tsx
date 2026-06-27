@@ -104,22 +104,32 @@ function SlugProfilePage() {
     return () => clearInterval(timer);
   }, [gallery, modalOpen]);
 
-  const downloadVCard = () => {
+  const downloadVCard = async () => {
     const vcard = buildVCard(profile);
     if (!vcard) return;
 
+    const filename = `${(profile?.name || "contact").replace(/\s+/g, "-").toLowerCase()}.vcf`;
     const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
+    // Web Share API : iOS et Android ouvrent directement l'app Contacts
+    // avec des boutons Enregistrer / Annuler clairs, sans étape de téléchargement.
+    if (navigator.share) {
+      const file = new File([blob], filename, { type: "text/vcard" });
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          return;
+        } catch {
+          // annulation par l'utilisateur ou erreur → fallback téléchargement
+        }
+      }
+    }
+
+    // Fallback desktop : téléchargement classique du .vcf
+    const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    // Sur mobile : pas d'attribut download → l'OS route le MIME type text/vcard
-    // vers l'app Contacts native directement, sans étape de téléchargement.
-    // Sur desktop : attribut download → télécharge le .vcf.
-    if (!isMobile) {
-      a.download = `${(profile?.name || "contact").replace(/\s+/g, "-").toLowerCase()}.vcf`;
-    }
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
